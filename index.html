@@ -1,0 +1,147 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<link rel="shortcut icon" type="image/png" href="mylogo.ico"/>
+<title>ms</title>
+<style>
+html,body {
+  overflow:hidden;
+}
+body {
+  font-size:10px;
+}
+#v-v-p {
+  position:absolute;
+  top:0;
+  left:0;
+  pointer-events:none;
+  z-index:1;
+}
+#v-v-p * {
+  pointer-events:auto;
+}
+div.image {
+  margin-left:auto;
+  margin-right:auto;
+  width:300px;
+  height:300px;
+}
+div.left {
+  float:left;
+}
+div.right {
+  float:right;
+}
+h1 {
+  text-align:center;
+  font-size:5em;
+  margin:.5em 0 0 0;
+}
+h1.x {
+  position:absolute;
+  left:0;bottom:0;
+  opacity:0;
+}
+p.address {
+  text-align:center;
+  font-size:3em;
+  margin:.25em;
+}
+div.links {
+  position:absolute;
+  left:0;bottom:0;
+}
+div.facts {
+  position:absolute;
+  right:0;bottom:0;
+}
+p.home {
+  position:absolute;
+  left:0;top:0;
+  text-align:left;
+  font-size:1.5em;
+  margin:0;
+}
+p.quotes {
+  position:absolute;
+  right:0;top:0;
+  text-align:right;
+  font-size:1.5em;
+  margin:0;
+}
+p.links {
+  text-align:left;
+  font-size:2em;
+  margin:0 0 1em 1em;
+}
+p.facts {
+  text-align:right;
+  font-size:3em;
+  margin:0 1em 1em 0;
+}
+
+</style>
+<script>
+
+function resize() {
+  var dx = Math.min(window.innerWidth,document.documentElement.clientWidth);
+  var dy = Math.min(window.innerHeight,document.documentElement.clientHeight);
+  var x = window.pageXOffset;
+  var y = window.pageYOffset;
+  var i,j;
+  var ww = dx-20;
+  var wh = dy-20;
+  var b = document.getElementsByTagName('body')[0];
+  var m = document.getElementById('meat');
+  var mx = document.getElementsByClassName('x')[0];
+  var d = document.getElementsByClassName('image')[0];
+  b.style.fontSize='10pt';
+  b.style.width=dx+'px';
+  d.style.width='300px';
+  d.style.height='300px';
+  var mw = mx.scrollWidth;
+  var mh = m.scrollHeight;
+  var dw = d.scrollWidth;
+  var dh = d.scrollHeight;
+  var dd = Math.max(dw,dh);
+  var scale = Math.min(ww/mw/2,wh/mh);
+  b.style.fontSize=scale*10+'pt';
+  d.style.width=scale*300+'px';
+  d.style.height=scale*300+'px';
+  var h = document.getElementsByClassName('links')[0].offsetHeight + b.offsetHeight;
+  var v = document.getElementById('v-v-p');
+  v.style.width=dx+'px';
+  v.style.height=Math.min(dy,h+20)+'px';
+  v.style.left=x+'px';
+  v.style.top=y+'px';
+
+}
+
+</script>
+</head>
+<body onload='resize()' onresize='resize()' onorientationchange='resize()'>
+<div id="meat">
+<div class="image"><img src="mylogo.jpg" width="100%" height="100%"/></div>
+
+  <h1>Mike Speciner</h1>
+  <h1 class='x'>Mike Speciner</h1>
+  <p class="address">10 Huckleberry Ln<br>Acton MA 01720-3731</p>
+  <p class="address">(978)635-0392
+  <p class="address"><a href="mailto:ms@alum.mit.edu">ms@alum.mit.edu</a></p>
+</div>
+<div id='v-v-p'>
+<div class="links">
+<p class="links"><a href="http://patft.uspto.gov/netacgi/nph-Parser?Sect1=PTO2&amp;Sect2=HITOFF&amp;p=1&amp;u=%2Fnetahtml%2FPTO%2Fsearch-bool.html&amp;r=0&amp;f=S&amp;l=50&amp;TERM1=speciner&amp;FIELD1=INNM&amp;co1=AND&amp;TERM2=&amp;FIELD2=&amp;d=PTXT">Patents</a></p>
+<p class="links"><a href="http://www.pearsonhighered.com/pearsonhigheredus/educator/product/products_detail.page?isbn=0130460192">Network Security</font></a></p>
+<p class="links"><a href="https://github.com/ms0">github</a></p>
+<p class="links"><a href="gas.html">gas</a></p>
+</div>
+<div class="facts">
+<p class="links"><a href="operation.html">arithmetic</a></p>
+<p class="facts" style="font-family:times,serif;">e<sup><i>&pi;i</i></sup> + 1 = 0</p>
+</div>
+<p class="home"><a href="index.html">Home</a></p>
+<p class="quotes"><a href="quotes.html">Favorite Quotes</a></p>
+</div>
+</body>
+</html>  

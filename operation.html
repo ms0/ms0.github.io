@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script>
+// precompute correct answers
+
+// for each input, onChange check for correct result
+// if blank, remove classes
+// if correct, make class ok
+// if incorrect, make class err
+// problem with this is that can fill out by trial and error!
+
+function mul(a,b) {
+  return a*b;
+}
+
+function add(a,b) {
+  return a+b;
+}
+
+function exp(a,b) {
+  return Math.pow(a,b);
+}
+
+var URLdict;
+
+function readURLquerystring() {
+  var d = {};
+  var s = window.location.search.slice(1);
+  var i;
+  var j;
+  var r;
+  if (s) {
+    var sv = s.split('&');
+    for (i in sv) {
+      j = sv[i].indexOf('=');
+      if (j) {
+	if (j < 0) j = sv[i].length;
+        r = sv[i].slice(j+1);
+        r = unescape(r).split(',');
+        d[sv[i].slice(0,j)] = r.length == 1 ? r[0] : r;
+      }
+    }
+  }
+  URLdict = d;
+}
+
+function randomlypermute(a) {
+  for (var n = a.length; n > 1; ) {
+    var i = Math.floor(Math.random()*n);
+    var t = a[--n];
+    a[n] = a[i];
+    a[i] = t;
+  }
+}
+
+var symbol = {'add':'+','mul':'&times;','exp':'^'}
+var f = {'add':add,'mul':mul,'exp':exp};
+var xc = {'add':0,'mul':1,'exp':1};
+var xr = {'add':0,'mul':1,'exp':1};
+var lc;
+var mc;
+var hc;
+var lr;
+var mr;
+var hr;
+var rows;
+var cols;
+var timer;
+var t0;
+var score;
+
+function init(again) {
+  if (!again) readURLquerystring();
+  document.getElementById('yay').className ='';
+  document.getElementById('optable').innerHTML = '';
+  var op = URLdict['op'] || 'add' ;      // operation ('add' or 'mul' or 'exp')
+  document.getElementById('op').value = op;
+  document.getElementById('locol').value = URLdict['lc'] || '';
+  document.getElementById('hicol').value = URLdict['hc'] || '';
+  document.getElementById('lorow').value = URLdict['lr'] || '';
+  document.getElementById('hirow').value = URLdict['hr'] || '';
+  document.getElementById('permute').checked = 'r' in URLdict;
+  mc = xc[op];
+  mr = xr[op];
+  lc = URLdict['lc'] || '0';  // low column
+  hc = URLdict['hc'] || lc;   // high column
+  lr = URLdict['lr'] || '0';  // low row
+  hr = URLdict['hr'] || lr;   // high row
+  lc = 1*lc;
+  hc = 1*hc;
+  lr = 1*lr;
+  hr = 1*hr;
+  rows = [];
+  cols = [];
+  if (lc <= mc && mc <= hc && lc < hc) {
+    for (i = 0; i < hc-lc+1; i++) cols[i] = i+lc;
+  } else {
+    cols = [0,1,2,3,4,5,6,7,8,9];
+  }
+  if (lr <= mr && mr <= hr && lr < hr) {
+    for (i = 0; i < hr-lr+1; i++) rows[i] = i+lr;
+  } else {
+    rows = [0,1,2,3,4,5,6,7,8,9];
+  }
+  if ('r' in URLdict) {
+    rows.splice(rows.indexOf(mr),1);
+    randomlypermute(rows);
+    rows.unshift(mr);
+    cols.splice(cols.indexOf(mc),1);
+    randomlypermute(cols);
+    cols.unshift(mc);
+  }
+  var maxlength = 0;
+  for (row in rows) {
+    for (col in cols) {
+      var x = (''+f[op](rows[row],cols[col])).length;
+      if (maxlength < x) maxlength = x;
+    }
+  }
+  var t = document.getElementsByTagName('tbody')[0];
+  var id;
+  for (row in rows) {
+    t.innerHTML += '<tr></tr>';    
+    var u = t.lastChild;
+    if (rows[row] == mr) {
+      for (col in cols) {
+	u.innerHTML += '<th>'+(cols[col]==mc ? symbol[op] : cols[col])+'</th>';
+      }
+    } else {
+      for (col in cols) {
+	if (cols[col] == mc) {
+	  u.innerHTML += '<th>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'+rows[row]+'</th>';
+	} else {
+	  if (!id) id = row+'-'+col;
+	  u.innerHTML += '<td><input onKeydown="checkkey(event,this)" onChange="check(this)" size="'+maxlength+'" maxlength="'+maxlength+'" id="'+row+'-'+col+'"name="'+f[op](rows[row],cols[col])+'"></td>';
+	}
+      }
+    }
+  }
+  if (!again) document.getElementById(id).focus();
+  stoptime();
+  document.getElementById('timer').innerHTML = '';
+  document.getElementById('timeper').innerHTML = '';
+  disable(false);
+}
+
+function starttime() {
+  t0 = Date.now();
+  timer = setInterval(updatetime,100);
+}
+
+function stoptime() {
+  disable(true);
+  timer = clearInterval(timer);
+}
+
+function toggletime() {
+  if (document.getElementById('yay').className != '') return;
+  if (timer) {
+    stoptime();
+  } else {
+    timer = setInterval(updatetime,100);
+    t0 = Date.now()-parseFloat(document.getElementById('timer').innerHTML)*1000;
+    disable(false);
+  }
+}
+
+
+function updatetime() {
+  var t = Date.now()-t0;
+  document.getElementById('timer').innerHTML = (t/1000).toFixed(1);
+  document.getElementById('timeper').innerHTML = (t/score/1000).toFixed(2);
+}
+
+function checkkey(e,o) {
+  id = o.id;    
+  rc = id.split('-');
+  r = 1*rc[0];
+  c = 1*rc[1];
+  var x=0;
+  var y=0;
+  switch (e.keyCode) {
+  case 9:  //tab
+    x=1;
+    if (c == cols.length-1) y=1;
+    break;
+  case 37: //leftarrow
+    x=-1;
+    break;
+  case 38: //uparrow
+    y=-1;
+    break;
+  case 39: //righttarrow
+    x=1;
+    break;
+  case 40: //downarrow
+    y=1;
+    break;
+  default:
+    return false;
+  }
+  id = o.id;    
+  rc = id.split('-');
+  r = 1*rc[0];
+  c = 1*rc[1];
+  c += x;
+  r += y;
+  if (c < 0) c = cols.length-1;
+  if (r < 0) r = rows.length-1;
+  if (c >= cols.length) c = 0;
+  if (r >= rows.length) r = 0;
+  if (cols[c] == mc) c += x;
+  if (rows[r] == mr) r += y;
+  if (c < 0) c = cols.length-1;
+  if (r < 0) r = rows.length-1;
+  if (c >= cols.length) c = 0;
+  if (r >= rows.length) r = 0;
+  id = r+'-'+c;
+  o = document.getElementById(id)
+  o.focus();
+  o.setSelectionRange(0,o.value.length);
+  e.stopPropagation();
+  e.preventDefault();
+  return false;
+}  
+
+function check(o) {
+  if (!timer) starttime();
+  o.className = o.value ? 1*o.value == 1*o.name ? 'ok' : 'err' : '';
+  score = document.getElementsByClassName('ok').length;
+  if (score == (rows.length-1)*(cols.length-1)) {
+    document.getElementById('yay').className ='show';
+    updatetime();
+    stoptime();
+  }
+}
+
+function disable(p) {
+  for (r=rows.length; r--;) for (c=cols.length;c--;) {
+    var o = document.getElementById(r+'-'+c);
+    if (o) o.disabled = p;
+  }
+}
+
+function setop(o) {
+  URLdict['op'] = o.value;  
+  init(true);
+}
+
+function setlorow(o) {
+  URLdict['lr'] = o.value;
+  init(true);
+}
+
+function sethirow(o) {
+  URLdict['hr'] = o.value;
+  init(true);
+}
+
+function setlocol(o) {
+  URLdict['lc'] = o.value;
+  init(true);
+}
+
+function sethicol(o) {
+  URLdict['hc'] = o.value;
+  init(true);
+}
+
+function permute(o) {
+  if (o.checked) URLdict['r']=''; else delete URLdict['r'];
+  init(true);
+}
+</script>
+<style>
+body {
+  font-size:20pt;
+}
+input {
+  text-align:center;
+}
+table input {
+  font-size:1em;
+  text-align:right;
+}  
+input.err {
+  background-color:pink;
+}
+input.ok {
+  background-color:lightgreen;
+}
+th {
+  text-align:right;
+}
+td.center {
+  text-align:center;
+}
+button {
+  font-size:1.5em;
+}
+#timer {
+  text-align:right;
+  cursor:vertical-text;
+}
+#yay {
+  position:fixed;
+  top:0;
+  bottom:0;
+  left:0;
+  right:0;
+  opacity:0;
+  z-index:-1;
+}
+#yay.show {
+  background-color:white;
+  opacity:.5;
+  z-index:1;
+}
+h1 {
+  text-align:center;
+  font-size:10em;
+}
+#controls {
+  position:fixed;
+  left:1em;
+  bottom:0;
+  font-size:10pt;
+  z-index:2;
+}
+</style>
+</head>
+<body onLoad='init()'>
+<div id='yay'><h1>YAY!</h1></div>
+<table><tbody id="optable"></tbody></table>
+
+<div id="controls">
+<input id="lorow" size="8" title="Enter minimum row value" placeholder="Min Row" onChange="setlorow(this)">
+<input id="hirow" size="8" title="Enter maximum row value" placeholder="Max Row" onChange="sethirow(this)">
+<select id="op" onChange="setop(this)">
+  <option value='add'>+</option>
+  <option value='mul'>&times;</option>
+  <option value='exp'>^</option>
+</select>
+<input id="locol" size="8" title="Enter minimum column value" placeholder="Min Column" onChange="setlocol(this)">
+<input id="hicol" size="8" title="Enter maximum column value" placeholder="Max Column" onChange="sethicol(this)">
+<label>Permute<input id="permute" title="Check to randomly permute rows and columns" type="checkbox" onChange="permute(this)"></label>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span id='timer' onclick='toggletime()'></span>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span id='timeper'></span>
+<p style="font-size:5pt">&copy; 2016 Mike Speciner</p>
+</div>
+</body>
+</html>

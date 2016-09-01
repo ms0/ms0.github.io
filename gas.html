@@ -1,0 +1,1354 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<link rel="shortcut icon" href="mylogo.ico"/>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js">
+</script>
+<script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.14/jquery-ui.min.js">
+</script>
+<script>
+Math.sgn = function (x) {
+  return x>0?1:x<0?-1:x;
+}
+
+Math.log1p = function (x) {
+  var xp1 = x+1;
+  return xp1==1?x:Math.log(xp1)*x/(xp1-1);
+}
+
+Math.expm1 = function (x) {
+  var ex = Math.exp(x);
+  var em1 = ex-1;
+  return ex==1?x:em1==-1?-1:isFinite(ex)?em1*x/Math.log(ex):ex;
+}
+
+
+Math.sinh = function(x) {
+  return .5*(Math.expm1(x)-Math.expm1(-x));
+}
+
+Math.cosh = function(x) {
+  return .5*(Math.exp(x)+Math.exp(-x));
+}
+
+Math.coshm1 = function(x) {
+  var s = Math.sinh(.5*x);
+  return 2*s*s;
+}
+
+Math.tanh = function(x) {
+  var s = Math.sinh(x);
+  return isFinite(s) ? s/Math.cosh(x) : Math.sgn(x);
+}
+
+Math.atanh = function(x) {
+  return .5*(Math.log1p(x)-Math.log1p(-x));
+}
+
+Math.asinh = function(x) {
+  var s = Math.sqrt(1+x*x);
+  return s<Math.SQRT2 ? Math.atanh(x/s) : Math.sgn(x)*Math.log(Math.abs(x)+s);
+}
+
+Math.acosh1p = function(x) {
+  var s = x*(x+2);
+  return isFinite(s) ? Math.log1p(x+Math.sqrt(s)) : Math.log(x)+Math.LN2;
+}
+
+Math.acosh = function(x) {
+  var s = x*x-1;
+  return isFinite(s) ? Math.log(x+Math.sqrt(s)) : Math.log(x)+Math.LN2;
+}
+
+Math.log2 = function(x) {
+  return Math.log(x)/Math.LN2;
+}
+</script>
+<script>
+/* Methods to serialize and parse standard javascript datastructures:
+   Arrays
+   Dictionary Objects
+   Dates
+   Strings
+   RegExps
+   Numbers, including Infinity and -Infinity and NaN
+   Booleans
+   Functions
+   null
+   undefined
+*/
+
+// Delimiters et al are designed to not need "escape"ing:
+// WARNING: Can't use number parts: Ee+-.0123456789
+var TERMINATOR='*';        // ] }
+var DELIMITER='/';         // ,
+var reDELIMITER = /\//g;
+var ArraySTART='A';        // [
+var DictionarySTART='D';   // {
+var DateSTART='T';         // followed by number
+var RegExpSTART='R';       // / uses StringDELIMITER followed by octit
+var StringDELIMITER='@';   // '
+var reStringDELIMITER = /@/g;
+var StringESC='/';        // \
+var FunctionSTART='F';    // name/arg0/arg1/...argn*{
+var PInfinity='I';        // Infinity
+var MInfinity='i';        // -Infinity
+var NAN='N'               // NaN
+var False='f';            // false
+var True='t';             // true
+var Null='n'              // null
+var Undefined='u'         // undefined
+
+function serialize(o) {
+  var s;
+  var t;
+  var k;
+  if (o == null) return o-0==0 ? Null : Undefined;
+  switch (o.constructor.name) {
+  case 'Array':
+    s = ArraySTART;
+    t = '';
+    for (k in o) {
+      s+=t+serialize(o[k]);
+      t = DELIMITER;
+    }
+    return (s+TERMINATOR);
+  case 'Object':
+    s = DictionarySTART;
+    t = '';
+    for (k in o) {
+      s+=t+k.replace(reDELIMITER,DELIMITER+DELIMITER).replace(reStringDELIMITER,DELIMITER+StringDELIMITER)+StringDELIMITER+serialize(o[k]);
+      t = DELIMITER;
+    }
+    return (s+TERMINATOR);
+  case 'Function':
+    return FunctionSTART+(o+'').slice(9).replace(reDELIMITER,DELIMITER+DELIMITER).replace(reStringDELIMITER,DELIMITER+StringDELIMITER)+StringDELIMITER;
+  case 'Number':
+    if (isNaN(o)) return 'N';
+    if (isFinite(o)) {
+      if (o) {
+	s = (Math.abs(o)+'').replace('+','');
+	if (s[0]=='0') s=s.slice(1);
+	if (s.slice(-3) == '000') {
+	  for (k = 3; s[s.length-1-k] == '0'; k++) ;
+	  s = s.slice(0,-k)+'e'+k;
+	}
+	return o<0?'-'+s:s;
+      }	
+      return '0';
+    }
+    return o<0?'i':'I';
+  case 'Boolean':
+    return o ? 't':'f';
+  case 'String':
+    return StringDELIMITER+o.replace(reDELIMITER,DELIMITER+DELIMITER).replace(reStringDELIMITER,DELIMITER+StringDELIMITER)+StringDELIMITER;
+  case 'Date':
+    return DateSTART+serialize(o.valueOf());
+  case 'RegExp':
+    return RegExpSTART+o.source.replace(reDELIMITER,DELIMITER+DELIMITER).replace(reStringDELIMITER,DELIMITER+StringDELIMITER)+StringDELIMITER+(o.global*4+o.ignoreCase*2+o.multiline);
+  default:
+    return '';
+  }
+}
+
+function deserialize(s) {
+  return parse(s)[0];
+}
+
+function parseString(s) {
+  var n;
+  var o = '';
+  for (n=1;n<s.length;n++) {
+    switch (s[n]) {
+    case DELIMITER:
+      o += s[++n];
+      continue;
+    case StringDELIMITER:
+      return [o,s.slice(n+1)];
+    default:
+      o += s[n];
+    }
+  }
+  throw "parse error: ran out of characters while parsing string";
+}
+
+function parse(s) {
+  var o = null; // object being created
+  var k;        // key while parsing dictionary entry, or modifiers in regexp
+  var v;        // value while parsing dictionary entry; or number string
+  if (s.length=0) throw "parse error: no characters while parsing object";
+  switch(s[0]){
+  case TERMINATOR:
+  case DELIMITER:
+    throw "parse error: delimiter or terminator instead of object";
+  case True:
+    return [true,s.slice(1)];
+  case False:
+    return [false,s.slice(1)];
+  case PInfinity:
+    return [Infinity,s.slice(1)];
+  case MInfinity:
+    return [-Infinity,s.slice(1)];
+  case NAN:
+    return [NaN,s.slice(1)];
+  case Null:
+    return [null,s.slice(1)];
+  case Undefined:
+    return [undefined,s.slice(1)];
+  case StringDELIMITER:
+    return parseString(s);
+  case RegExpSTART:
+    v = parseString(s);
+    k = v[1][0]-0;    // numerical encoding of modifiers
+    return [RegExp(v[0],((k&4)?'g':'')+((k&2)?'i':'')+((k&1)?'m':'')),v[1].slice(1)];
+  case ArraySTART:
+    s = s.slice(1);
+    o = [];
+    while (s[0] != TERMINATOR) {
+      v = parse(s);
+      s = v[1];
+      o.push(v[0]);
+      if (s[0] == TERMINATOR) return [o,s.slice(1)];
+      if (s[0] != DELIMITER) throw "parse error: array entry doesn't end with delimiter or terminator";
+      s = s.slice(1);
+    }
+    return [o,s.slice(1)];
+  case DictionarySTART:
+    o = {};
+    while (s[1] != TERMINATOR) {
+      v = parseString(s);    // parseString assumes initial StringDELIMITER
+      s = v[1];
+      k = v[0];
+      v = parse(s);
+      o[k] = v[0];
+      s = v[1];
+      if (s[0] == TERMINATOR) return [o,s.slice(1)]
+      if (s[0] != DELIMITER) throw "parse error: dictionary entry doesn't end with delimiter or terminator";
+    }
+    return [o,s.slice(2)];
+  case DateSTART:
+    v = parse(s.slice(1));
+    v[0] = new Date(v[0]);
+    return v;
+  case FunctionSTART:
+    v = parseString(s);
+    eval('v[0] = function '+v[0]);
+    return v;
+  default:
+    // better be a number!!!
+    v = /^(\+|-)?((\d+\.?\d*)|(\d*\.?\d+))([Ee](\+|-)?\d+)?/.exec(s);
+    if (!v) throw "parse error: unexpected character while parsing number";
+    return [parseFloat(v[0]),s.slice(v[0].length)];
+  }
+}
+
+function isEmpty(o) {
+  for (var k in o) return false;
+  return true;
+}
+
+var cookiedict = {};
+
+function readCookie(p) {
+  var d = {};
+  var pl = p.length;
+  var i,j,x,y;
+  var cookies = document.cookie.split(";");
+  for (i = 0; i < cookies.length; i++) {
+    j = cookies[i].indexOf("=");
+    if (j < 0) continue;
+    x = cookies[i].substr(0,j);
+    y = cookies[i].substr(j+1);
+    x = x.replace(/^\s+|\s+$/g,"");
+    if (p != x.substring(0,pl)) continue;
+    d[x.substring(pl)] = deserialize(unescape(y));
+  }
+  cookiedict = d;
+}
+
+function getCookie(p,k) {
+  if (isEmpty(cookiedict)) {
+    readCookie(p);
+  }
+  return cookiedict[k];
+}
+
+function setCookie(p,k,v,t) {
+  cookiedict[k] = v;
+  var cv = escape(serialize(v));
+  document.cookie=p+k+"="+cv+"; expires="+t.toUTCString()+"; path=/";
+}
+
+function getCookieDir(p) {
+  if (isEmpty(cookiedict)) {
+    readCookie(p);
+  }
+  var a = [];
+  for (k in cookiedict) a.push(k);
+  return a;
+}
+</script>
+<script>
+function keydown(e) {
+  var a = document.activeElement;
+  if (a.tagName.toLowerCase() != "input") {
+    switch (e.which) {
+    case $.ui.keyCode.LEFT:
+      bumpspeed(-1);
+      return false;
+    case $.ui.keyCode.RIGHT:
+      bumpspeed(1);
+      return false;
+    case $.ui.keyCode.DELETE:
+      if (deleteItem(selectedItem)) {
+	draw();
+      }
+    default:
+    }
+  }
+  return true;
+}
+
+function badval(e) {
+  e.style.background='pink';
+  e.focus();
+  return false;
+}
+
+function checkColor(id) {  // make sure blank or legit color
+  return false;
+}
+
+function checkNum(id) {    // make sure legit number
+  var e = document.getElementById(id);
+  var v = e.value-'0';
+  if ((/^\s*$/).test(e.value) || isNaN(v)) {
+    return badval(e);
+  } else {
+    switch (id) {
+    case 'm':
+      if (v <= 0) return badval(e);
+      break;
+    case 'r':
+      if (v <= 0 || !isFinite(v)) return badval(e);
+      break;
+    default:
+      if (!isFinite(v)) return badval(e);
+    }
+    e.style.background='white';
+    e.value = v;
+  }
+  return false;
+}
+</script>
+<script>
+var COOKIEPREFIX = '_gas_';
+
+var GASSIZE=512;
+var GASCENTER=[GASSIZE/2,GASSIZE/2];
+var MAXSPEED = 10;
+var MAXSPEEDSCALE = 16;
+var SPEEDWIDTH = 2*Math.asinh(MAXSPEEDSCALE);
+var TIMESTEP = .01;
+var MOMENT = TIMESTEP*Math.pow(2,-51);  // to give wall collisions priority
+var TIMEZERO = -2*MOMENT;      // for simultaneous collisions
+var WALL = 1;
+var BALL = 2;
+
+var selectable = false;
+var frozenSelection = false;
+var position = [NaN,NaN];
+var selectedItem = [0,0];
+var timer = null;    // if null, paused; else, running
+var time = 0;                      // elapsed time
+var speededit = false;
+var speed = 1;
+var scontext;
+var gcontext;
+var walls = [];    // array of walls
+var balls = [];    // array of balls
+
+function setPosition(e) {
+  if (frozenSelection)
+    return null;
+  var p = getPosition(e);
+  position[0] = p[0]-GASCENTER[0];
+  position[1] = GASCENTER[1]-p[1];
+  return position;
+}
+
+function getPosition(e) {
+  var targ;
+  if (!e) e = window.event;
+  if (e.target) targ = e.target;
+  else if (e.srcElement) targ = e.srcElement;
+  if (targ.nodeType == 3) targ = targ.parentNode;
+
+  return [e.pageX - $(targ).offset().left,e.pageY - $(targ).offset().top];
+}
+
+/* this doesn't work and I don't know why...
+function xordraw(item) {
+  if (item) {
+    var gco = gcontext.globalCompositeOperation;
+    gcontext.globalCompositeOperation='xor';
+    switch(item.type) {
+    case 'wall':
+      gcontext.strokeStyle = 'rgb(0,255,0)';
+      gcontext.beginPath();
+      gcontext.moveTo(item.x[0][0],item.x[0][1]);
+      gcontext.lineTo(item.x[1][0],item.x[1][1]);
+      gcontext.stroke();    
+      break;
+    case 'ball':
+      gcontext.fillStyle = 'rgb(0,255,0)';
+      gcontext.beginPath();
+      gcontext.arc(item.x[0],item.x[1],item.r,
+		  0,Math.PI*2,true);
+      gcontext.closePath();
+      gcontext.fill();
+      break;
+    }
+    gcontext.globalCompositeOperation=gco;
+  }
+}
+*/
+
+function highlightItem(item) {
+  if (item[0]) {
+    var e;
+    var i;
+    gcontext.save();
+    gcontext.strokeStyle = 'rgba(65,65,255,.5)';
+    gcontext.fillStyle = 'rgba(65,65,255,.5)';    // hack for points
+    gcontext.lineWidth = 5;
+    switch(item[0]) {
+    case WALL:
+      i = walls[item[1]];
+      gcontext.beginPath();
+      if (i.l2 == 0) {
+	gcontext.arc(GASCENTER[0]+i.x[0][0],GASCENTER[1]-i.x[0][1],
+		     gcontext.lineWidth/2,0,Math.PI*2,true);
+	gcontext.closePath();
+	gcontext.fill();
+      } else {
+	gcontext.moveTo(GASCENTER[0]+i.x[0][0],GASCENTER[1]-i.x[0][1]);
+	gcontext.lineTo(GASCENTER[0]+i.x[1][0],GASCENTER[1]-i.x[1][1]);
+	gcontext.stroke();    
+      }
+      e = document.getElementById("x00");
+      e.style.background='white';
+      e.value = i.x[0][0];
+      e = document.getElementById("x01");
+      e.style.background='white';
+      e.value = i.x[0][1];
+      e = document.getElementById("x10");
+      e.style.background='white';
+      e.value = i.x[1][0];
+      e = document.getElementById("x11");
+      e.style.background='white';
+      e.value = i.x[1][1];
+      break;
+    case BALL:
+      i = balls[item[1]];
+      gcontext.beginPath();
+      gcontext.arc(GASCENTER[0]+i.x[0],GASCENTER[1]-i.x[1],i.r,
+		  0,Math.PI*2,true);
+      gcontext.closePath();
+      gcontext.stroke();
+      e = document.getElementById("x0");
+      e.style.background='white';
+      e.value = i.x[0];
+      e = document.getElementById("x1");
+      e.style.background='white';
+      e.value = i.x[1];
+      e = document.getElementById("v0");
+      e.style.background='white';
+      e.value = i.v[0];
+      e = document.getElementById("v1");
+      e.style.background='white';
+      e.value = i.v[1];
+      e = document.getElementById("r");
+      e.style.background='white';
+      e.value = i.r;
+      e = document.getElementById("m");
+      e.style.background='white';
+      e.value = i.m;
+      e = document.getElementById("c");
+      e.style.background='white';
+      e.value = i.c;
+      break;
+    }
+    gcontext.restore();
+  }
+}
+
+function deleteItem(item) {    // and select next item of same type
+  if (item[0]) {
+    switch(item[0]) {
+    case WALL:
+      walls.splice(item[1],1);
+      if (walls.length)	item[1] %= walls.length; else item[0] = 0;
+      return true;
+    case BALL:
+      balls.splice(item[1],1);
+      if (balls.length) item[1] %= balls.length; else item[0] = 0;
+      return true;
+    }
+  }
+  return false;
+}
+
+function enableSelect(e) {
+  selectable = true;
+  return false;
+}
+
+function disableSelect(e) {
+  selectable = false;
+  if (!frozenSelection) selectedItem[0] = 0;
+  if (!timer) draw();
+  return false;
+}
+
+function freezeSelection(e) {
+  frozenSelection = selectedItem[0] ? !frozenSelection : false;
+}
+
+function updatePosition(e) {    // on mousemove in gas canvas
+  setPosition(e);
+  selectable = true;
+  if (!timer) selectItem() && draw();
+  return false;
+}
+
+function selectItem() {
+  if (frozenSelection || !selectable) return false;
+
+  var bestd = Infinity;    // best distance
+  var besto = [0,0];    // best object
+  var x;
+  var d;
+  var dist;
+  var dx;
+  var l2;
+  var tm;
+
+  for (w in walls) {
+    x = walls[w].x;
+    l2 = walls[w].l2;
+    d = [x[0][0]-position[0],x[0][1]-position[1]];       // wall endpt rel to position
+    if (l2) {    // not only an endpoint
+      dx = walls[w].dx;    // wall vector
+      tm = walls[w].tm;
+      if (Math.abs(2*(position[0]*dx[0]+position[1]*dx[1])-tm)<=l2) {
+	dist = Math.abs(d[0]*dx[1]-d[1]*dx[0])/Math.sqrt(l2);
+      } else {
+	dist = d[0]*d[0]+d[1]*d[1];
+	d = [x[1][0]-position[0],x[1][1]-position[1]];
+	dist = Math.sqrt(Math.min(dist,d[0]*d[0]+d[1]*d[1]));
+      }
+    } else {
+      dist = Math.sqrt(d[0]*d[0]+d[1]*d[1]);
+    }
+    if (dist < bestd) {
+      bestd = dist;
+      besto = [WALL,w];
+    }
+  }
+  for (b in balls) {
+    x = balls[b].x;
+    d = [x[0]-position[0],x[1]-position[1]];
+    dist = Math.max(0,Math.sqrt(d[0]*d[0]+d[1]*d[1])-balls[b].r);
+    if (dist>bestd) continue;
+    if (dist<bestd ||
+	(dist==bestd && besto[0]==BALL && balls[b].r<balls[besto[1]].r)) {
+      besto = [BALL,b];
+      bestd = dist;
+    }
+  }
+  if (bestd > 16) besto[0] = 0;
+  if (selectedItem[0] != besto[0] || selectedItem[1] != besto[1]) {
+    selectedItem = besto;
+    return true;   // selectedItem changed
+  }
+  return false;    // selectedItem didn't change
+}
+</script>
+
+<script>
+function cleargas() {
+  stop();
+  setgostop('GO');
+  setstep();
+  enableEdit(true);
+  time = 0;
+  speededit = false;
+  speed = 1;
+  balls = [];
+  walls = [];
+  position = [NaN,NaN];
+  selectedItem = [0,0];
+  
+}
+
+function loadFiles(id) {
+  var e = document.getElementById(id);
+  var files = e.files;
+  var i;
+  var f;
+  for (i=0; i < files.length; i++) {
+    var r = new FileReader();
+    r.onload =
+      function(e) {
+	if (e.target.readyState == FileReader.DONE) {
+	  loadFile(e.target.result);
+	}
+      };
+    r.onerror = function (e) {alert('Read failed!');};
+    r.readAsText(files[i]);
+  }
+  e.value = '';    // so we can read the files again
+  return false;
+}
+
+function loadFile(s) {
+  var o;
+  var lines=s.split("\n");
+  for (var i in lines) {
+    var l = lines[i];
+    if (l.length == 0) continue;
+    var n = l.search(/:|$/);
+    var t = l.slice(0,n).replace(/^\s*/,"").replace(/\s*$/,"");
+    var v = l.slice(n+1).replace(/^\s*/,"").replace(/\s*$/,"");
+    switch (t) {
+    case "title":
+      document.getElementById("title").value = v;
+      break;
+    case "clearballs":
+      balls = [];
+      if (selectedItem[0]==BALL) selectedItem[0]=0;
+      break;
+    case "clearwalls":
+      walls = [];
+      if (selectedItem[0]==WALL) selectedItem[0]=0;
+      break;
+    case "ball":
+      eval("o="+v);
+      makeBall(o);
+      break;
+    case "wall":
+      eval("o="+v);
+      makeWall(o.x[0][0],o.x[0][1],o.x[1][0],o.x[1][1]);
+      break;
+    case "time":
+      time = v-0;
+      break;
+    case "speed":
+      speed = quantizeSpeed(v-0);
+      break;
+    }
+  }
+  draw();
+  drawSpeed();
+}
+
+function save2popup() {
+  var i;
+  var title = document.getElementById('title').value;
+  var n = window.open('',title,'height=512,width=512,resizable=1,scrollbars=1');
+  var d = n.document;
+  var x = '<html><head><title>'+title+'</title><style type="text/css">p{font-family:"Lucida Console";font-size:9pt;text-align:left;line-height:9pt;margin:0}</style></head><body>';
+  x += '<p>title:'+title+'</p><p>clearwalls</p><p>clearballs</p>';
+  x += '<p>time:'+time+'</p>';
+  x += '<p>speed:'+speed+'</p>';
+  for (i in walls) {
+    var w = walls[i];
+    x += '<p>wall:{x:[['+w.x[0][0]+','+w.x[0][1]+'],['+w.x[1][0]+','+w.x[1][1]+']]}</p>'
+  }
+  for (i in balls) {
+    var b = balls[i];
+    x += '<p>ball:{x:['+b.x[0]+','+b.x[1]+'],v:['+b.v[0]+','+b.v[1]+'],m:'+b.m+',r:'+b.r;
+    x += (b.c ? ',c:"'+b.c+'"' : '') + '}</p>';
+  }
+  x += '</body></html>';
+  d.write(x);
+  d.close();
+  n.focus();
+}
+
+function load() {
+  var t = document.getElementById("title").value;
+  var o = getCookie(COOKIEPREFIX,t);
+  var i;
+  if (o) {
+    cleargas();
+    var b = o['balls'];
+    for (i in  b) {
+      makeBall(b[i]);
+    }
+    var w = o['walls'];
+    for (i in w) {
+      makeWall(w[i].x[0][0],w[i].x[0][1],w[i].x[1][0],w[i].x[1][1]);
+    }
+    time = o['time'];
+    speed = quantizeSpeed(o['speed']);
+    selectedItem = o['item'];
+    frozenSelection = !!selectedItem[0];
+    selectItem();
+    draw();
+    drawSpeed();
+  } else {
+    alert(t+' not found');
+  }
+  return false;
+}
+
+function save() {
+  // save in cookie, using name supplied in Title
+  // to be included: time, balls, walls
+  var r = stop();
+  var t = document.getElementById("title").value;
+  var s = frozenSelection ? [selectedItem[0],selectedItem[1]] : [0,0];
+  var w = [];
+  for (var i in walls) {
+    w.push({x:[[walls[i].x[0][0],walls[i].x[0][1]],[walls[i].x[1][0],walls[i].x[1][1]]]});
+  }
+  var d = new Date();
+  d.setTime(d.getTime()+1000*60*60*24*365.25*10);
+  setCookie(COOKIEPREFIX,t,
+	    {time:time,speed:speed,item:s,
+	     balls:$.extend(true,[],balls),walls:w},
+	    d);
+  if (r) gostop();
+  return false;
+}
+
+function stop() {
+  if (timer) {
+    clearInterval(timer);
+    timer=null;
+    return true;
+  }
+  return false;
+}
+
+function setgostop(s) {
+  document.getElementById('gostop').innerHTML=s;
+}
+
+function setstep() {
+  document.getElementById('step').disabled=!!timer;
+}
+
+function gostop() {
+  if (!stop()) {
+    timer = setInterval(step,1000*TIMESTEP);
+  } 
+  setstep();
+  setgostop(timer?'PAUSE':'RESUME');
+  enableEdit(!timer);
+  return false;
+}
+
+function enableEdit(tf) {
+  $(':text').attr('disabled',!tf);
+}
+
+function quantizeSpeed(s) {    // quantize speed
+  return pos2speed(speed2pos(s));
+}
+
+
+function speed2pos(s) {
+  return (96+192*Math.asinh(s)/SPEEDWIDTH);
+}
+
+function pos2speed(p) {
+  var s = Math.sinh((p-96)*SPEEDWIDTH/192);
+  if (s) {
+    if (Math.abs(s) > MAXSPEED) s = Math.sgn(s)*MAXSPEED;
+    var ls = Math.log2(Math.abs(s));
+    s =
+      ls > 3 ? Math.round(s) :
+      ls > 2 ? Math.round(s*2)/2 :
+      ls > 1 ? Math.round(s*4)/4 :
+      ls > 0 ? Math.round(s*8)/8 :
+      Math.round(s*16)/16;
+  }
+  return s;
+}
+
+function bumpspeed(dir) {
+  var s = Math.sgn(speed);
+  if (s) {
+    var as = s*(speed+dir/32);
+    if (as >= MAXSPEED) {
+      as = MAXSPEED;
+    } else {
+      var ls = Math.max(-1,Math.floor(Math.log2(as)));
+      speed += dir*Math.pow(2,ls-3);
+    }
+  } else {
+    speed = dir/16;
+  }
+  drawSpeed();
+}
+
+
+function drawSpeed() {    // draw speed control
+  scontext.clearRect(0,0,192,48);
+  scontext.strokeStyle = "hsl(0,0%,0%)";
+  scontext.linewidth="3";
+  scontext.beginPath();
+  scontext.moveTo(0,24);
+  scontext.lineTo(192,24);
+  scontext.stroke();
+  var speedpos = speed2pos(speed);
+  scontext.beginPath();
+  scontext.moveTo(speedpos,24-8);
+  scontext.lineTo(speedpos,24+8);
+  scontext.stroke();
+  scontext.font = 'bold 14px sans-serif';
+  scontext.textBaseline = 'ideographic';
+  scontext.textAlign = 'center';
+  scontext.fillStyle = speededit ? 'red' : 'black';
+  scontext.fillText('SPEED', speedpos, 48);
+  scontext.fillStyle = 'black';
+  var prec = Math.floor(Math.max(-1,Math.log2(Math.abs(speed))));
+  scontext.fillText(speed.toFixed(3-prec), speedpos, 16);
+}
+
+function setSpeed(e) {
+  var pos = getPosition(e);
+  if (speededit) {
+    speed = pos2speed(pos[0]);
+    drawSpeed();
+  } else {
+    var targpos = speed2pos(speed);
+    $("#speed").css('cursor', Math.abs(pos[0]-targpos) < 2 ? 'crosshair' : '');
+  }
+  return false;
+}
+
+function speedblur(e) {
+  speededit = false;
+  var s = $("#speed");
+  s.css('cursor','');
+  drawSpeed();
+  return false;
+}
+
+function speedfocus(e) {
+  speededit = false;
+  return false;
+}
+
+function speedtoggle(e) {
+  if (speededit) {
+    speededit = false;
+  } else {
+    var pos = getPosition(e);
+    var targpos = speed2pos(speed);
+    if (Math.abs(pos[0]-targpos) < 2) {
+      $("#speed").css('cursor','crosshair')
+      speededit = true;
+    }
+  }
+  drawSpeed();
+  return false;
+}
+
+/*****************************************************************
+   walls parameters:
+     endpoint vectors
+     elasiticity?
+     charge?
+     gravity (field gradient perpendicular to wall, but 1/r^2 at endpoints)?
+
+*/
+
+function alterWall() {
+  if (selectedItem[0]==WALL) changeWall();
+  return false;
+}
+
+function changeWall() {
+  var x00 = document.getElementById("x00").value-0;
+  var x01 = document.getElementById("x01").value-0;
+  var x10 = document.getElementById("x10").value-0;
+  var x11 = document.getElementById("x11").value-0;
+  if (isFinite(x00) && isFinite(x01) && isFinite(x10) && isFinite(x11)) {
+    var w = walls[selectedItem[1]];
+    updateWall(w,x00,x01,x10,x11);
+    draw();
+    return true;
+  }
+  return false;
+}
+
+function createWall() {
+  selectedItem = [WALL,walls.length];
+  makeWall(0,0,0,0);
+  changeWall() || draw();
+  return false;
+}
+
+function deleteWall() {
+  if (selectedItem[0]==WALL && deleteItem(selectedItem)) draw();
+  return false;
+}
+
+function updateWall(w,x0,y0,x1,y1) {
+  w.x = [[x0,y0],[x1,y1]];
+  var dx = (x0-x1);
+  var dy = (y0-y1);
+  w.dx = [dx,dy];
+  w.l2 = dx*dx+dy*dy;
+  w.l = Math.sqrt(w.l2);
+  w.pnl = y0*x1-x0*y1;
+  w.tm = (x0+x1)*dx+(y0+y1)*dy;
+}
+
+function makeWall(x0,y0,x1,y1) {
+  updateWall(walls[walls.push({})-1],x0,y0,x1,y1);
+}
+
+/*****************************************************************
+   balls parameters:
+     color or invisible
+     position vector
+     velocity vector
+     mass
+     radius
+     charge?
+     magnetic moment?
+     spin?
+     elasticity?
+*/
+
+function alterBall() {
+  if (selectedItem[0]==BALL) changeBall();
+  return false;
+}
+
+function changeBall() {
+  var x0 = document.getElementById("x0").value-0
+  var x1 = document.getElementById("x1").value-0;
+  var v0 = document.getElementById("v0").value-0
+  var v1 = document.getElementById("v1").value-0;
+  var r = document.getElementById("r").value-0;
+  var m = document.getElementById("m").value-0;
+  var c = document.getElementById("c").value;
+  if (isFinite(x0) && isFinite(x1) && isFinite(v0) && isFinite(v1) &&
+      isFinite(r) && r > 0 && m > 0) {
+    var b = balls[selectedItem[1]];
+    b.x[0] = x0; b.x[1] = x1;
+    b.v[0] = v0; b.v[1] = v1;
+    b.r = r;
+    b.m = m;
+    b.c = c;
+    draw();
+    return true;
+  }
+  return false;
+}
+
+function createBall() {
+  selectedItem = [BALL,balls.length];
+  makeBall({x:[0,0],v:[0,0],m:1,r:GASSIZE/2,c:'pink'});
+  changeBall() || draw();
+  return false;
+}
+
+function deleteBall() {
+  if (selectedItem[0]==BALL && deleteItem(selectedItem)) draw();
+  return false;
+}
+
+function makeBall(d) {
+  balls.push($.extend(true,{},d));
+}
+
+function step() {
+  update();
+  selectItem();
+  draw();
+  return false;
+}
+
+function draw() {
+  var i;
+  gcontext.clearRect(0,0,2*GASCENTER[0],2*GASCENTER[1]);
+  gcontext.strokeStyle = "black";    // black walls
+  gcontext.fillStyle = "black";      // hack for points
+  for (w in walls) {    // draw walls
+    i = walls[w];
+    gcontext.beginPath();
+    if (i.x[0][0] == i.x[1][0] && i.x[0][1] == i.x[1][1]) {
+      gcontext.arc(GASCENTER[0]+i.x[0][0],GASCENTER[1]-i.x[0][1],1/2,0,Math.PI*2,true);
+      gcontext.closePath();
+      gcontext.fill()
+    } else {
+      gcontext.moveTo(GASCENTER[0]+i.x[0][0],GASCENTER[1]-i.x[0][1]);
+      gcontext.lineTo(GASCENTER[0]+i.x[1][0],GASCENTER[1]-i.x[1][1]);
+      gcontext.stroke();    
+    }
+  }
+  for (b in balls) {    // draw balls
+    i = balls[b];
+    if (i.c) {    // if no color, ball is invisible!
+      gcontext.fillStyle = i.c;
+      gcontext.beginPath();
+      gcontext.arc(GASCENTER[0]+i.x[0],GASCENTER[1]-i.x[1],i.r,0,Math.PI*2,true);
+      gcontext.closePath();
+      gcontext.fill();
+    }
+  }
+  highlightItem(selectedItem);
+  document.getElementById("time").innerHTML=time.toFixed(6);
+}
+
+function updateby(dt) {
+  // update positions by time difference dt
+  time += dt;
+  for (b in balls) {
+    balls[b].x[0] = balls[b].x[0]+balls[b].v[0]*dt;
+    balls[b].x[1] = balls[b].x[1]+balls[b].v[1]*dt;
+  }
+}
+
+function update() {
+  var tt = 0;  // total real time elapsed during step
+  var tc;      // real time of first collision from "now"
+  var ctype;   // collision type (ball-ball, ball-wall, ball-endpoint)
+  var b0;      // ball colliding
+  var c0;      // collidee (ball or wall or endpoint)
+  var b;
+  var w;
+  var n;
+  var i;
+  
+  var dx;
+  var l;
+  var x;
+  var x0;
+  var x1;
+  var v;
+  var r;
+  var v2;
+  var xXv;
+  var rad;
+  var tv;
+  var tvm;
+  var rx;
+  var rv;
+  var vv;
+  var xXv;
+  var R;
+  var RR;
+  var mb;
+  var mc;
+  var M;
+
+  var t;
+  var s = speed;
+
+  while (true) {
+    ctype = Infinity;
+    tc = TIMESTEP-TIMEZERO-tt;
+    for (b in balls) {
+      v = [s*balls[b].v[0],s*balls[b].v[1]];
+      r = balls[b].r;
+      for (i in walls) {
+        // check for ball-endpoint collisions
+	w = walls[i];
+	for (n in w.x) {
+	  x = [balls[b].x[0]-w.x[n][0],balls[b].x[1]-w.x[n][1]];
+	  v2 = v[0]*v[0]+v[1]*v[1];
+	  xXv = x[0]*v[1]-x[1]*v[0];
+	  rad = r*r*v2-xXv*xXv;
+	  if (rad>0) {
+	    t = -(x[0]*v[0]+x[1]*v[1] + Math.sqrt(rad))/v2;
+	    if (TIMEZERO <= t && t < tc) {
+	      tc = t;
+	      ctype = 0;
+	      b0 = balls[b];
+	      c0 = w.x[n];
+	    }
+	  }
+	}
+      }
+      for (i in walls) {
+	// check for ball-wall collisions
+	w = walls[i];
+	l2 = w.l2;
+	if (!l2) continue;    // only an endpoint
+	l = w.l;
+        dx = w.dx;
+	x = balls[b].x;
+	vnl = v[0]*dx[1]-v[1]*dx[0];
+	xnl = x[0]*dx[1]-x[1]*dx[0];
+	t = (-r*Math.sgn(vnl)*l+w.pnl-xnl)/vnl;
+	if (TIMEZERO <= t && t < tc) {    // collision with infinite wall
+	  x0 = x[0]+t*v[0];
+	  x1 = x[1]+t*v[1];
+	  if (Math.abs(2*(x0*dx[0]+x1*dx[1])-w.tm)<=l2) {
+	    tc = t;    // collision with real part of wall
+	    ctype = 1;
+	    b0 = balls[b];
+	    c0 = w;
+	  }
+	}
+      }
+      for (c=b; c--; ) {
+        // check for ball-ball collisions
+	rx = [balls[c].x[0]-balls[b].x[0],balls[c].x[1]-balls[b].x[1]];
+	rv = [s*balls[c].v[0]-v[0],s*balls[c].v[1]-v[1]];
+        R = balls[b].r+balls[c].r;
+	vv = rv[0]*rv[0]+rv[1]*rv[1];
+	xXv = rx[0]*rv[1]-rx[1]*rv[0];
+	rad = R*R*vv-xXv*xXv;
+	if (rad>0) {
+	  t = -(rx[0]*rv[0]+rx[1]*rv[1]+Math.sqrt(rad))/vv;
+	  if (TIMEZERO <= t && t < tc && (ctype >= 2 || t+MOMENT < tc)) {
+	    tc = t;
+	    ctype = 2;
+	    b0 = balls[b];
+	    c0 = balls[c];
+	  }
+	  R = Math.abs(balls[b].r-balls[c].r);    // check for inside collision
+	  rad = R*R*vv-xXv*xXv;    // smaller than above rad
+	  if (rad>0) {
+	    t = -(rx[0]*rv[0]+rx[1]*rv[1]-Math.sqrt(rad))/vv;
+	    if (TIMEZERO <= t && t < tc) {
+	      tc = t;
+	      ctype = 2;
+	      b0 = balls[b];
+	      c0 = balls[c];
+	    }
+	  }
+	}
+      }
+    }
+    if (ctype < Infinity) {
+      updateby(s*tc);   // simulation time elapsed
+      // update velocities of colliding balls
+      switch(ctype) {
+      case 0:    // ball - wall-end
+	r = [b0.x[0]-c0[0],b0.x[1]-c0[1]];
+	tv = 2*(b0.v[0]*r[0]+b0.v[1]*r[1])/(b0.r*b0.r);
+	b0.v[0] -= tv*r[0];
+	b0.v[1] -= tv*r[1];
+	break;
+
+      case 1:    // ball - wall
+        dx = c0.dx;
+	tv = 2*(b0.v[0]*dx[1]-b0.v[1]*dx[0])/c0.l2;
+	b0.v[0] -= tv*dx[1];
+	b0.v[1] += tv*dx[0];
+	break;
+
+      case 2:    // ball - ball
+	rx = [c0.x[0]-b0.x[0],c0.x[1]-b0.x[1]];
+	rv = [c0.v[0]-b0.v[0],c0.v[1]-b0.v[1]];
+	RR = rx[0]*rx[0]+rx[1]*rx[1];
+	mb = b0.m;
+	mc = c0.m;
+	M = mb+mc;
+	if (!isFinite(M)) {
+	  M = 2;
+	  mb = isFinite(mb) ? 0 : isFinite(mc) ? 2 : 1;
+	  mc = M-mb;
+	}
+        tv = 2*(rv[0]*rx[0]+rv[1]*rx[1])/(M*RR);
+	tvm = tv*mc;
+	b0.v[0] += rx[0]*tvm;
+	b0.v[1] += rx[1]*tvm;
+	tvm = tv*mb;
+	c0.v[0] -= rx[0]*tvm;
+	c0.v[1] -= rx[1]*tvm;
+	break;
+      }
+      tt += tc;    // update real time elapsed since start of step
+      continue;
+    }
+    break;
+  }
+  updateby(s*(TIMESTEP-tt));    // update positions to end of step
+}
+</script>
+<style type="text/css">
+table.center {margin-left:auto;margin-right:auto}
+p.center {text-align:center}
+td.center {text-align:center}
+</style>
+<script>
+function reposition(e) {
+  var windowwidth = window.innerWidth;
+  var arena = document.getElementById("arena");
+  var panel = document.getElementById("panel");
+  var arenawidth = arena.offsetWidth;
+  var panelwidth = panel.offsetwidth;
+  if (panelwidth+arenawidth > windowwidth) {
+    arena.style.cssFloat = "top";
+    panel.style.cssFloat = "top";
+  } else {
+    arena.style.cssFloat = "left";
+    panel.style.cssFloat = "left";
+  }
+  $(window).scrollTop(arena.offsetTop);
+}
+</script>
+</head>
+
+<body onload="reposition()" onresize="reposition()">
+<div id="panel" style="float:left">
+<table class="center" style="font-size:24pt">
+<tr>
+<td><label for="title">Title</label></td>
+<td class="center"><input id="title" type="text" style="font-size:24pt;width:10em" /></td>
+</tr>
+</table>
+<p class="center">
+<button type="button" id="load" onClick="load()" style="font-size:18pt">LOAD</button>
+<button type="button" id="save" onClick="save()" style="font-size:18pt">SAVE</button>
+</p>
+<p class="center">
+<label for="loadFile">Load from file:</label>
+<input type="file" id="loadFile" onChange="loadFiles(id)"/>
+<button type="button" id="save2window" onClick="save2popup()">SHOW AS TEXT</button>
+</p>
+<p>&nbsp</p>
+<p class="center">Ball</p>
+<table class="center">
+<tr>
+<td><label for="x0">position</label></td>
+<td class="center"><input id="x0" type="text" onChange="checkNum(id)" style="text-align:center;width:10em" /></td>
+<td class="center"><input id="x1" type="text" onChange="checkNum(id)" style="text-align:center;width:10em" /></td>
+<td><label for="x0" style="color:white">position</label></td>
+</tr>
+<tr>
+<td><label for="v0">velocity</label></td>
+<td class="center"><input id="v0" type="text" onChange="checkNum(id)" style="text-align:center;width:10em" /></td>
+<td class="center"><input id="v1" type="text" onChange="checkNum(id)" style="text-align:center;width:10em" /></td>
+<td><label for="v0" style="color:white">velocity</label></td>
+</tr>
+</table>
+<table class="center">
+<tr>
+<td><label for="r">radius</label></td>
+<td class="center"><input id="r" type="text" onChange="checkNum(id)" style="text-align:center;width:10em" /></td>
+<td><label for="r" style="color:white">radius</label></td>
+</tr>
+<tr>
+<td><label for="m">mass</label></td>
+<td class="center"><input id="m" type="text" onChange="checkNum(id)" style="text-align:center;width:10em" /></td>
+<td><label for="m" style="color:white">mass</label></td>
+</tr>
+<tr>
+<td><label for="c">color</label></td>
+<td class="center"><input id="c" type="text" onChange="checkColor(id)" style="text-align:center;width:10em" /></td>
+<td><label for="c" style="color:white">color</label></td>
+</tr>
+</table>
+<table class="center">
+<tr>
+<td class="center"><button type="button" id="createBall" onClick="createBall()">CREATE</button></td>
+<td class="center"><button type="button" id="alterBall" onClick="alterBall()">ALTER</button></td>
+<td class="center"><button type="button" id="deleteBall" onClick="deleteBall()">DELETE</button></td>
+</tr>
+</table>
+<p>&nbsp</p>
+<p class="center">Wall</p>
+<table class="center">
+<tr>
+<td><label for="x00">point 0</label></td>
+<td class="center"><input id="x00" type="text" onChange="checkNum('x00')" style="text-align:center;width:10em" /></td>
+<td class="center"><input id="x01" type="text" onChange="checkNum('x01')" style="text-align:center;width:10em" /></td>
+<td><label for="x00" style="color:white">point 0</label></td>
+</tr>
+<tr>
+<td><label for="x10">point 1</label></td>
+<td class="center"><input id="x10" type="text" onChange="checkNum('x10')" style="text-align:center;width:10em" /></td>
+<td class="center"><input id="x11" type="text" onChange="checkNum('x11')" style="text-align:center;width:10em" /></td>
+<td><label for="x10" style="color:white">point 1</label></td>
+</tr>
+</table>
+<table class="center">
+<tr>
+<td class="center"><button type="button" id="createWall" onClick="createWall()">CREATE</button></td>
+<td class="center"><button type="button" id="alterWall" onClick="alterWall()">ALTER</button></td>
+<td class="center"><button type="button" id="deleteWall" onClick="deleteWall()">DELETE</button></td>
+</tr>
+</table>
+</div>
+<div id="arena" style="float:left" width="600">
+<table class="center" cellspacing="12pt" style="width:512"><tr>
+<td><button type="button" id="gostop" onClick="gostop()"
+ style="width:120pt;font-size:24pt">GO</button></td>
+<td><canvas id="speed" width="192" height="48" title="click on | to activate/deactivate or use left and right arrow keys"></canvas></td>
+<td><button type="button" id="step" onClick="step()"
+ style="width:120pt;font-size:24pt">STEP</button></td>
+</table>
+<div id="container" style="text-align:center">
+<canvas id="gas" width="512" height="512" title="click to freeze/unfreeze object selection"></canvas>
+</div>
+<p id="time" class="center"></p>
+</div>
+
+
+<script>
+gcontext = document.getElementById("gas").getContext('2d');
+gcontext.lineWidth="1";
+gcontext.lineCap="round";
+gcontext.lineJoin="round";
+
+makeWall(-256,-256,-256,256);
+makeWall(-256,256,256,256);
+makeWall(256,256,256,-256);
+makeWall(256,-256,-256,-256);
+makeWall(0,56,-56,0);
+makeWall(20,56,44,56);
+
+
+makeBall({c:'gray',m:1,r:10,x:[-236,236],v:[100,-233]});
+makeBall({c:'dimgray',m:10,r:3,x:[-156,156],v:[100,-100]});
+makeBall({c:'red',m:100,r:1,x:[-246,246],v:[100,-100]});
+for (n = 1; n<=10; n++) {
+  makeBall({c:'gray',m:1,r:10,x:[-256+20.01*n,-244],v:[0,0]});
+}
+for (n = 1; n<=50; n++) {
+  makeBall({c:'darkgray',m:.5,r:2,x:[-6+5*n,-244],v:[0,0]});
+}
+makeBall({c:'black',m:Infinity,r:50,x:[256,0],v:[0,0]});
+makeBall({c:'yellow',m:1,r:5,x:[244,0],v:[10,-20]});
+makeBall({c:'darkgray',m:.5,r:20,x:[234,235],v:[0,0]});
+makeBall({c:'dimgray',m:10,r:3,x:[234,235],v:[0,0]});
+makeBall({c:'darkgray',m:.5,r:20,x:[145,235],v:[0,0]});
+makeBall({c:'dimgray',m:10,r:3,x:[145+6,235],v:[0,0]});
+makeBall({c:'dimgray',m:10,r:3,x:[145-3,235+5],v:[0,0]});
+makeBall({c:'dimgray',m:10,r:3,x:[145-3,235-5],v:[0,0]});
+
+scontext = document.getElementById("speed").getContext('2d');
+drawSpeed();
+$("#speed").bind({mouseenter:speedfocus,
+		  mouseleave:speedblur,
+		  mousemove:setSpeed,
+		  click:speedtoggle});
+
+selectedItem = [0,0];
+$("#gas").bind({mousemove:updatePosition,
+		mouseenter:enableSelect,
+		mouseleave:disableSelect,
+		click:freezeSelection});
+$("#gas").css('cursor','crosshair');
+
+draw();
+
+document.onkeydown = keydown;
+
+</script>
+<p style="position:fixed;bottom:0;left:0;font-size:5pt">&copy 2011 Mike Speciner</p></body>
+</html>

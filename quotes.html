@@ -1,0 +1,82 @@
+<html>
+<head>
+  <title>Quotes</title>
+<style>
+#v-v-p {
+  position:absolute;
+  top:0;
+  left:0;
+  pointer-events:none;
+  z-index:1;
+}
+#v-v-p * {
+  pointer-events:auto;
+}
+h1 {
+  font-size:2.4em;
+}
+p {
+  font-size:1.4em;
+}
+p.left {
+  text-align:left;
+  margin:0;
+}
+p.right {
+  text-align:right;
+  margin:0 0 1em 0;
+}
+
+p.home {
+  position:absolute;
+  left:0;top:0;
+  text-align:left;
+  font-size:1em;
+  margin:0;
+}
+p.quotes {
+  position:absolute;
+  right:0;top:0;
+  text-align:right;
+  font-size:1em;
+  margin:0;
+}
+</style>
+<script>
+function resize() {
+  var dx = Math.min(window.innerWidth,document.documentElement.clientWidth);
+  var dy = Math.min(window.innerHeight,document.documentElement.clientHeight);
+  var x = window.pageXOffset;
+  var y = window.pageYOffset;
+  var v = document.getElementById('v-v-p');
+  v.style.width=dx+'px';
+  v.style.height=dy+'px';
+  v.style.left=x+'px';
+  v.style.top=y+'px';
+  var i,j;
+  var ww = dx-20;
+  var wh = dy-20;
+  var b = document.getElementsByTagName('body')[0];
+  b.style.fontSize='10pt';
+  b.style.width=ww+'px';
+}
+</script>
+</head>
+<body onload='resize()' onresize='resize()' onorientationchange='resize()'>
+  <h1 align="center">Favorite Quotes</h1>
+  <p class="left">Never attribute to malice what can be adequately explained by incompetence.</p>
+  <p class="right">&#8212;Anonymous</p>
+  <p class="left">I didn&rsquo;t say I didn&rsquo;t say it. I said I didn&rsquo;t say I said it.<br>I want to make that very clear.</p>
+  <p class="right">&#8212;George Romney</p>
+  <p class="left">It&rsquo;s all about following the recipe.<br>And making the appropriate substitutions.</p>
+  <p class="right">&#8212;Dawn Perlner</p>
+  <p class="left">If you torture the data long enough, it will confess to anything.</p>
+  <p class="right">&#8212;Ronald Harry Coase</p>
+  <p class="left">Of course, society may not be ready for children en masse seeking illusory relationships with intelligent devices&#8212even if they are just mimicking their parents.</p>
+  <p class="right">&#8212;Natasha Singer, NYTimes</p>
+  <div id='v-v-p'>
+    <p class="home"><a href="index.html">Home</a></p>
+    <p class="quotes"><a href="quotes.html">Favorite Quotes</a></p>
+  </div>
+</body>
+</html>
