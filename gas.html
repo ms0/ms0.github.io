@@ -1,8 +1,7 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 <html>
 <head>
-<link rel="shortcut icon" href="mylogo.ico"/>
+<link rel="shortcut icon" href="http://dl.dropbox.com/u/17718830/mylogo.ico"/>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js">
 </script>
 <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.14/jquery-ui.min.js">
@@ -352,7 +351,7 @@ var MAXSPEEDSCALE = 16;
 var SPEEDWIDTH = 2*Math.asinh(MAXSPEEDSCALE);
 var TIMESTEP = .01;
 var MOMENT = TIMESTEP*Math.pow(2,-51);  // to give wall collisions priority
-var TIMEZERO = -2*MOMENT;      // for simultaneous collisions
+var TIMEZERO = -256*MOMENT;      // for simultaneous collisions
 var WALL = 1;
 var BALL = 2;
 
