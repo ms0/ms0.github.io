@@ -1,0 +1,231 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script>
+
+
+var context;
+
+//var x = [50,125,250,375,450,375,250,125];
+//var y = [250,375,450,375,250,125,50,125];
+
+var savex = [50,250,450];
+var savey = [50,450,225];
+
+var x = [];
+var y = [];
+
+
+var timer;
+
+function init() {
+  context = document.getElementsByTagName('canvas')[0].getContext('2d');
+  context.linewidth = '1';
+  context.lineCap = 'round';
+  context.lineJoin = 'round';
+  context.strokeStyle = 'black';
+  $('canvas').bind({click:updatePosition});
+}
+
+function go() {
+  timer = setInterval(step,100);
+}
+
+function stop() {
+  timer=clearInterval(timer);
+  draw();
+}
+
+function len(a,b) {
+  return Math.sqrt(a*a+b*b);
+}
+
+function len2(a,b) {
+  return a*a+b*b;
+}
+
+function nv(a,b) {    // return normalized vector
+  var l = len(a,b);
+  return l ? [a/l,b/l] : [0,0];
+}
+
+/****************************************************************
+  We really want the csc of half the angle times the bisector
+  So, first we need to compute the bisector
+  Note, (v1 x v2)/(|v1|*|v2|) = sin angle
+****************************************************************/
+function delta(i,g) {
+  var l = x.length;
+  var p = (i-1+l)%l;
+  var n = (i+1)%l;
+  var dp = nv(x[p]-x[i],y[p]-y[i]);        // unit first vector
+  var dn = nv(x[n]-x[i],y[n]-y[i]);        // unit second vector
+  var dm = nv(dp[0]+dn[0],dp[1]+dn[1]);    // unit bisector
+  var d = 1/Math.abs(dp[0]*dm[1]-dp[1]*dm[0]);    // csc a/2
+  switch (g) {
+  case '1':
+    break;
+  case '1m' :
+    d -= 1;
+    break;
+  case '2':
+    d *= d;
+    break;
+  case '2m' :
+    d = d*d-1;
+    break;
+  case 'e':
+    d = Math.log(d);
+    break;
+  case 'v' :
+    return [(x[p]+x[n]-2*x[i])/128,(y[p]+y[n]-2*y[i])/128];
+  case 'w' :
+    dp = len(x[p]-x[i],y[p]-y[i]);
+    dn = len(x[n]-x[i],y[n]-y[i]);
+    var s = dp+dn;
+    if (!s) return [0,0];
+    var wp = dp/s;
+    var wn = dn/s;
+    return [(wp*x[p]+wn*x[n]-x[i])/128,(wp*y[p]+wn*y[n]-y[i])/128];
+  case 'w2' :
+    dp = len2(x[p]-x[i],y[p]-y[i]);
+    dn = len2(x[n]-x[i],y[n]-y[i]);
+    var s = dp+dn;
+    if (!s) return [0,0];
+    var wp = dp/s;
+    var wn = dn/s;
+    return [(wp*x[p]+wn*x[n]-x[i])/128,(wp*y[p]+wn*y[n]-y[i])/128];
+  }
+  return [dm[0]*d,dm[1]*d];
+}
+
+function mean(a) {
+  var s = 0;
+  var i;
+  for (i=0;i<a.length;i++) s += a[i];
+  return s && s/a.length;
+}
+
+function centroid() {
+  return [mean(x),mean(y)];
+}
+  
+function radius() {
+  var i;
+  var d = 0;
+  var c = centroid();
+  for (i=0;i<x.length;i++) {
+    di = len(x[i]-c[0],y[i]-c[1]);
+    if (d < di) d = di;
+  }
+  return d;
+}
+
+function mind() {
+  var i;
+  var d = 1000;
+  var l = x.length;
+  for (i=0;i<l;i++) {
+    di = len(x[(i+1)%l]-x[i],y[(i+1)%l]-y[i]);
+    if (d > di) d = di;
+  }
+  return d;
+}
+      
+/****************************************************************
+Compute the scaled bisectors of each angle, then move each vertex
+by its scaled bisector times a scale factor proportional to the
+radius of the diagram.
+****************************************************************/
+function shrink() {
+  var g = $('select').val();
+  var i;
+  var R = radius();
+  if (R) {
+    var r = R/128;
+//    var r = Math.min(R/128,mind()/2);
+    var a = Array(x.length);
+    for (i=0;i<a.length;i++) a[i] = delta(i,g);
+    for (i=0;i<a.length;i++) {
+      x[i] += r*a[i][0];
+      y[i] += r*a[i][1];
+    } 
+  }
+  return R;
+}
+
+function draw() {
+  context.clearRect(0,0,512,512);
+  context.beginPath();
+  for (i in x) context.lineTo(x[i],y[i]);
+  context.closePath();
+  context.stroke();
+}
+
+function step() {
+  if (shrink() < 1) stop(); else draw();
+}
+
+function clr() {
+  x = [];
+  y = [];
+  draw();
+}
+
+function save() {
+  savex = x.slice();
+  savey = y.slice();    
+}
+
+function load() {
+  x = savex.slice();
+  y = savey.slice();
+  draw();
+}
+
+function updatePosition(e) {    // on click in canvas
+  var xy = getPosition(e);
+  x.push(xy[0]);
+  y.push(xy[1]);
+  draw();  
+  return false;
+}
+
+function getPosition(e) {
+  var targ;
+  if (!e) e = window.event;
+  if (e.target) targ = e.target;
+  else if (e.srcElement) targ = e.srcElement;
+  if (targ.nodeType == 3) targ = targ.parentNode;
+  return [e.pageX - $(targ).offset().left,e.pageY - $(targ).offset().top];
+}
+
+$(init);  
+</script>
+<style>
+canvas {border:1px solid black;cursor:crosshair;}
+</style>
+</head>
+<body>
+  <canvas width="512" height="512" title='click to add points to polygon'></canvas>
+  <div>
+    <button type="button" onClick="go()" title='click to start shrinking'>GO</button>
+    <button type="button" onClick="stop()" title='click to stop shrinking'>STOP</button>
+    <button type="button" onClick="clr()" title='click to clear polygon'>CLEAR</button>
+    <button type="button" onClick="save()" title='click to save polygon'>SAVE</button>
+    <button type="button" onClick="load()" title='click to load saved polygon'>LOAD</button>
+    &nbsp;<label for='curvature'>Curvature</label>
+    <select id='curvature' title='select curvature algorithm'>
+      <option value='1'>csc &alpha;/2</option>
+      <option value='1m'>csc &alpha;/2 - 1</option>
+      <option value='2'>(csc &alpha;/2)**2</option>
+      <option value='2m'>(csc &alpha;/2 - 1)**2</option>
+      <option value='e'>ln csc &alpha;/2</option>
+      <option value='v'>sum of outgoing vectors</option>
+      <option value='w'>weighted sum of outgoing vectors</option>
+     <option value='w2'>square-weighted sum of outgoing vectors</option>
+    </select>
+  </div>
+</body>
+</html>
