@@ -1,0 +1,271 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+
+<script>
+
+/****************************************************************
+2D Plot routine ...
+
+mapping: from user x,y to canvas coords x,y
+
+grid: values for x, values for y
+
+
+parametric function: produce x,y pairs given t
+function: produce y given x
+
+curve: values for x or for t
+instantiated curve: array of x,y pairs
+
+we will draw points as dots, so they should be close enough together
+
+****************************************************************/
+// math functions
+
+Math.sgn = function (x) {
+  return x<0?-1:x>0?1:x;
+}
+
+Math.log1p = Math.log1p || function (x) {
+  var xp1 = x+1;
+  return xp1==1?x:Math.log(xp1)*x/(xp1-1);
+}
+
+Math.expm1 = Math.expm1 || function (x) {
+  var ex = Math.exp(x);
+  var em1 = ex-1;
+  return ex==1?x:em1==-1?-1:isFinite(ex)?em1*x/Math.log(ex):ex;
+}
+
+
+Math.sinh = Math.sinh || function(x) {
+  return .5*(Math.expm1(x)-Math.expm1(-x));
+}
+
+Math.cosh = Math.cosh || function(x) {
+  return .5*(Math.exp(x)+Math.exp(-x));
+}
+
+Math.coshm1 = Math.coshm1 || function(x) {
+  var s = Math.sinh(.5*x);
+  return 2*s*s;
+}
+
+Math.tanh = Math.tanh || function(x) {
+  var s = Math.sinh(x);
+  return isFinite(s) ? s/Math.cosh(x) : sgn(x);
+}
+
+Math.atanh = Math.atanh || function(x) {
+  return .5*(Math.log1p(x)-Math.log1p(-x));
+}
+
+Math.asinh = Math.asinh || function(x) {
+  var s = Math.sqrt(1+x*x);
+  return s<Math.SQRT2 ? Math.atanh(x/s) : Math.sgn(x)*Math.log(Math.abs(x)+s);
+}
+
+Math.acosh1p = Math.acosh1p || function(x) {
+  var s = x*(x+2);
+  return isFinite(s) ? Math.log1p(x+Math.sqrt(s)) : Math.log(x)+Math.LN2;
+}
+
+Math.acosh = Math.acosh || function(x) {
+  var s = x*x-1;
+  return isFinite(s) ? Math.log(x+Math.sqrt(s)) : Math.log(x)+Math.LN2;
+}
+
+/****************************************************************/
+
+// initialization and graphing
+
+CWIDTH = 512;		// canvas width in pixels
+CHEIGHT = 512;		// canvas height in pixels
+XSCALE = YSCALE = 64;	// pixels per unit, horizontally and vertically
+
+XMIN = -CWIDTH/2/XSCALE;    // min abscissa (in units)
+YMIN = -CHEIGHT/2/YSCALE;   // min ordinate (in units)
+
+function cleargraph(gctx) {	// restore blank canvas
+  gctx.clearRect(0,0,CWIDTH,CHEIGHT);
+}
+
+// some functions to plot
+// Math.exp
+// Math.sinh
+// Math.sin
+
+function constant(c) {
+  return function(x) {return c;};
+}
+function ident(x) { return x; }
+function square(x) { return x*x; }
+function cube(x) { return x*x*x; }
+function sqrt(x) { return Math.sgn(x)*Math.sqrt(Math.abs(x)); }
+function cbrt(x) { return Math.sgn(x)*Math.pow(Math.abs(x),1/3); }
+function log(x) { return x <= 0 ? -1024 : Math.log(x); }
+
+function plotpoints(gctx,X,Y,c) {    // given X and Y arrays and color, plot
+  // X,Y are abscissa and ordinate arrays in scaled canvas coords
+  gctx.fillStyle = c;
+  var i;
+  for (i = 0; i < X.length; i++) {
+    gctx.beginPath();
+    gctx.arc((X[i]-XMIN)*XSCALE,CHEIGHT-1-(Y[i]-YMIN)*YSCALE,1,0,Math.PI*2,true);
+    gctx.closePath();
+    gctx.fill();
+  }
+}
+
+function f(a) {    // mapping function from user coords to scaled canvas coords
+  // a: 0 -> linear, 1-> asinh, oo -> ln
+  var b = Math.max(1/a,1);
+  var c = a > 1 ? (1-1/a)*Math.log(2*a) : 0;
+  return a <= 0 ? ident :
+    a < Infinity ? function(x) {return Math.asinh(a*x)*b - c;} : log;
+}
+
+function mapplot(gctx,X,Y,a,b,c) {    // map and plot array of points
+  // X,Y are abscissa and ordinate arrays in user units
+  // a,b are horizontal and vertical mapping parameters
+  // c is color
+  var fx = f(a);
+  var fy = f(b);
+  plotpoints(gctx,X.map(fx),Y.map(fy),c);
+}
+
+function mapline(gctx,x0,y0,x1,y1,a,b,c) {    // map and plot lines
+  // x0,y0 and x1,y1 are endpoints in user units
+  // a,b are horizontal and vertical mapping parameters
+  // c is color
+  var fx = f(a);
+  var fy = f(b);
+  gctx.strokeStyle = c;
+  gctx.beginPath();
+  gctx.moveTo((fx(x0)-XMIN)*XSCALE,CHEIGHT-1-(fy(y0)-YMIN)*YSCALE);
+  gctx.lineTo((fx(x1)-XMIN)*XSCALE,CHEIGHT-1-(fy(y1)-YMIN)*YSCALE);
+  gctx.stroke();
+}  
+
+var t = 0;	// mapping stepper; sinh(t) is mapping parameter
+var I;	// interval timer
+var F;  // step function
+
+var X = [];	// abscissa array in user coords
+var Y = [];	// ordinate array in user coords
+for (x = -8*CWIDTH; x < 8*CWIDTH; x++) X.push(x/XSCALE);
+for (y = -8*CWIDTH; y < 8*CHEIGHT; y++) Y.push(y/YSCALE);
+
+function init() {
+  canvas = document.getElementById('graph');
+  canvas.width = CWIDTH;
+  canvas.height = CHEIGHT;
+  gctx = graph.getContext('2d');
+  F = function () {
+    document.getElementById('t').value = t;
+    var a = Math.sinh(t);	// mapping parameter is sinh(t)
+    var xa = document.getElementById('logx').checked ? a : 0;
+    var ya = document.getElementById('logy').checked ? a : 0;
+    cleargraph(gctx);
+    for (var i = 0,j = 0; i <= 8*CHEIGHT/YSCALE; i+=1<<j) {	// horizontal gridlines
+      if (i >= 8<<j) j += 3;
+      mapline(gctx,-8*CWIDTH/XSCALE,i,8*CWIDTH/XSCALE,i,xa,ya,'rgba(191,191,255,1)');
+      mapline(gctx,-8*CWIDTH/XSCALE,-i,8*CWIDTH/XSCALE,-i,xa,ya,'rgba(191,191,255,1)');
+    }
+    for (var i = 0,j = 0; i <= 8*CWIDTH/XSCALE; i+=1<<j) {	// vertical gridlines
+      if (i >= 8<<j) j += 3;
+      mapline(gctx,i,-8*CHEIGHT/YSCALE,i,8*CHEIGHT/YSCALE,xa,ya,'rgba(191,191,255,1)');
+      mapline(gctx,-i,-8*CHEIGHT/YSCALE,-i,8*CHEIGHT/YSCALE,xa,ya,'rgba(191,191,255,1)');
+    }
+    // plot curves ...
+    var c = document.getElementById('curves').children;
+    for (var i = 0; i < c.length; i++) {
+      var o = c[i];
+      if (o.className.indexOf(' gray') < 0) {
+	mapplot(gctx,X,Y.map(eval(o.getAttribute('func'))),xa,ya,getComputedStyle(o).color);
+      }
+    };
+    if (a == Infinity) clearInterval(I);	// end at ln
+    t += 1/128;    // step
+  }
+  F();
+}
+
+function go() {
+  document.getElementById('go').disabled = true;
+  I = clearInterval(I);
+  I = setInterval(F, 1);
+}
+
+function step() {
+  stop();
+  F();
+}
+
+function unstep() {
+  if (!I && t) {
+    t -= 1/128;
+    F();
+  }
+}
+
+function stop() {
+  I = clearInterval(I);
+  document.getElementById('go').disabled = false;
+}
+
+function newt(s) {
+  stop();
+  t = parseFloat(s);
+  F();
+}
+
+function toggle(o) {
+  var c = o.className;
+  var i = c.indexOf(' gray');
+  if (i < 0) {
+    o.className = c+' gray';
+  } else {
+    o.className = c.slice(0,i);
+  }
+  unstep();
+}
+
+</script>
+
+<style>
+.black {color:rgba(0,0,0,1);}
+.red {color:rgba(255,0,0,1);}
+.green {color:rgba(0,255,0,1);}
+.blue {color:rgba(0,0,255,1);}
+.cyan {color:rgba(0,255,255,1);}
+.magenta {color:rgba(255,0,255,1);}
+.yellow {color:rgba(255,255,0,1);}
+.orange {color:rgba(255,127,0,1);}
+.gray {color:rgba(127,127,127,1);}
+#curves span {font-size:2em;}
+</style>
+
+</head>
+<body onload='init()'>
+
+   <div class='canvas'>
+     <canvas id='graph' class='graph'></canvas>
+   </div>
+   <p id='curves'>Click to remove/add:
+     <span class='black' onClick='toggle(this)' func='ident'><i>x</i></span>,
+     <span class='red' onClick='toggle(this)' func='Math.sinh'>sinh</span>,
+     <span class='green' onClick='toggle(this)' func='Math.exp'>exp</span>,
+     <span class='blue' onClick='toggle(this)' func='square'><i>x</i><sup>2</sup></span>,
+     <span class='cyan' onClick='toggle(this)' func='sqrt'><i>x</i><sup>1/2</sup></span>,
+     <span class='magenta' onClick='toggle(this)' func='cube'><i>x</i><sup>3</sup></span>,
+     <span class='yellow' onClick='toggle(this)' func='cbrt'><i>x</i><sup>1/3</sup></span>,
+     <span class='orange' onClick='toggle(this)' func='Math.sin'>sin</span>
+   </p>
+   <button type='button' id='go' onClick='go()'>GO</button>
+   <button type='button' onClick='step()'>STEP</button>&nbsp;
+   <label>t:<input id='t' type='text' onChange='newt(this.value)' onFocus='stop()'/></label>
+   &nbsp;<label>lin&rarr;log x<input type='checkbox' id='logx' onChange='unstep()'></label>&nbsp;<label>lin&rarr;log y<input type='checkbox' id='logy' onChange='unstep()' checked></label>
+</body>
+</html>
