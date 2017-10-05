@@ -168,13 +168,15 @@ function init() {
     var xa = document.getElementById('logx').checked ? a : 0;
     var ya = document.getElementById('logy').checked ? a : 0;
     cleargraph(gctx);
-    for (var i = 0,j = 0; i <= 8*CHEIGHT/YSCALE; i+=1<<j) {	// horizontal gridlines
-      if (i >= 8<<j) j += 3;
+    var j0 = ya > 1.5 ? ya > 8 ? -6 : -3 : 0;
+    for (var i = 0,j = j0; i <= 8*CHEIGHT/YSCALE; i+=Math.pow(2,j)) {	// horizontal gridlines
+      if (i >= Math.pow(2,j+3)) j += 3;
       mapline(gctx,-8*CWIDTH/XSCALE,i,8*CWIDTH/XSCALE,i,xa,ya,'rgba(191,191,255,1)');
       mapline(gctx,-8*CWIDTH/XSCALE,-i,8*CWIDTH/XSCALE,-i,xa,ya,'rgba(191,191,255,1)');
     }
-    for (var i = 0,j = 0; i <= 8*CWIDTH/XSCALE; i+=1<<j) {	// vertical gridlines
-      if (i >= 8<<j) j += 3;
+    var j0 = xa > 1.5 ? xa > 8 ? -6 : -3 : 0;
+    for (var i = 0,j = j0; i <= 8*CWIDTH/XSCALE; i+=Math.pow(2,j)) {	// vertical gridlines
+      if (i >= Math.pow(2,j+3)) j += 3;
       mapline(gctx,i,-8*CHEIGHT/YSCALE,i,8*CHEIGHT/YSCALE,xa,ya,'rgba(191,191,255,1)');
       mapline(gctx,-i,-8*CHEIGHT/YSCALE,-i,8*CHEIGHT/YSCALE,xa,ya,'rgba(191,191,255,1)');
     }
