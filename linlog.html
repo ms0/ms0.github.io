@@ -85,7 +85,9 @@ CHEIGHT = 512;		// canvas height in pixels
 XSCALE = YSCALE = 64;	// pixels per unit, horizontally and vertically
 
 XMIN = -CWIDTH/2/XSCALE;    // min abscissa (in units)
+XMAX = -XMIN;
 YMIN = -CHEIGHT/2/YSCALE;   // min ordinate (in units)
+YMAX = -YMIN;
 
 function cleargraph(gctx) {	// restore blank canvas
   gctx.clearRect(0,0,CWIDTH,CHEIGHT);
@@ -123,7 +125,15 @@ function f(a) {    // mapping function from user coords to scaled canvas coords
   var b = Math.max(1/a,1);
   var c = a > 1 ? (1-1/a)*Math.log(2*a) : 0;
   return a <= 0 ? ident :
-    a < Infinity ? function(x) {return Math.asinh(a*x)*b - c;} : log;
+    a < Infinity ? function(z) {return Math.asinh(a*z)*b - c;} : log;
+}
+
+function fi(a) { // mapping function from scaled canvas coords to user coords
+  // a: 0 -> linear, 1-> asinh, oo -> ln
+  var b = Math.max(1/a,1);
+  var c = a > 1 ? (1-1/a)*Math.log(2*a) : 0;
+  return a <= 0 ? ident :
+    a < Infinity ? function(z) {return Math.sinh((z+c)/b)/a;} : Math.exp;
 }
 
 function mapplot(gctx,X,Y,a,b,c) {    // map and plot array of points
@@ -152,11 +162,6 @@ var t = 0;	// mapping stepper; sinh(t) is mapping parameter
 var I;	// interval timer
 var F;  // step function
 
-var X = [];	// abscissa array in user coords
-var Y = [];	// ordinate array in user coords
-for (x = -8*CWIDTH; x < 8*CWIDTH; x++) X.push(x/XSCALE);
-for (y = -8*CWIDTH; y < 8*CHEIGHT; y++) Y.push(y/YSCALE);
-
 function init() {
   canvas = document.getElementById('graph');
   canvas.width = CWIDTH;
@@ -180,12 +185,15 @@ function init() {
       mapline(gctx,i,-8*CHEIGHT/YSCALE,i,8*CHEIGHT/YSCALE,xa,ya,'rgba(191,191,255,1)');
       mapline(gctx,-i,-8*CHEIGHT/YSCALE,-i,8*CHEIGHT/YSCALE,xa,ya,'rgba(191,191,255,1)');
     }
+    var fixa = fi(xa);
+    var X = [];
+    for (x=XMIN; x<=XMAX; x+=1/XSCALE) X.push(fixa(x));
     // plot curves ...
     var c = document.getElementById('curves').children;
     for (var i = 0; i < c.length; i++) {
       var o = c[i];
       if (o.className.indexOf(' gray') < 0) {
-	mapplot(gctx,X,Y.map(eval(o.getAttribute('func'))),xa,ya,getComputedStyle(o).color);
+	mapplot(gctx,X,X.map(eval(o.getAttribute('func'))),xa,ya,getComputedStyle(o).color);
       }
     };
     if (a == Infinity) clearInterval(I);	// end at ln
