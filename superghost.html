@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script>
+var cookiedict = {};
+
+//use cookies to save parameters
+//use cookies to save novel words
+//need way to remove novel words?
+//use cookies to save win/loss percentage?
+
+function readcookie() {
+  var d = {};
+  var i,j,x,y;
+  var cookies = document.cookie.split(";");
+  for (i = 0; i < cookies.length; i++) {
+    j = cookies[i].indexOf("=");
+    x = cookies[i].substr(0,j);
+    y = cookies[i].substr(j+1);
+    x = x.replace(/^\s+|\s+$/g,"");
+    d[x] = unescape(y);
+  }
+  cookiedict = d;
+}
+
+function getcookie(k) {
+  if (cookiedict.length == 0) {
+    readcookie();
+  }
+  return cookiedict[k];
+}
+
+function setcookie(k,v) {
+  cookiedict[k] = v;
+  var cv = '';
+  var a = 0;
+  if (v!==undefined) {
+    cv=escape(v);
+    a=60*60*24*366;
+  }
+  document.cookie=k+'='+cv+';Max-Age='+a;
+}
+</script>
+<style type="text/css">
+.hidden
+{
+position:fixed;
+right:0;
+bottom:0;
+font-size:0;
+}
+.letter
+{
+font-family:"Lucida Console";
+font-size:11pt;
+text-align:center;
+}
+h1 {font-size:3em;font-style:italic;text-align:center}
+h2 {text-align:center}
+table.center {margin-left:auto; margin-right:auto}
+p {text-align:center}
+td {text-align:center}
+</style>
+<script>
+// superghost script
+// translated from superghost.py
+
+var dv;         // vector of dictionaries
+var cs;         // current string
+var sgmode;     // -1 if superghost; 1 if ghost
+var minwordlength;   // min length to be considered a word
+var wordlistname;    // name of wordlist
+
+
+function resetgame() {    // to start a game
+  cs = '';
+  showstate(1);    // note: first move allows user to pass!
+  // we could do accounting here
+}
+
+function makemove(m) {    // make a move
+  if (m!=null) {
+    if (m[0] > 0) {
+      cs += m[1];
+    }
+    else if (m[0] < 0) {
+      cs = m[1]+cs;
+    }
+  }
+}
+
+
+function umoved(s) {    // user has moved (callback from select)
+  if (!cs) enableparamchange(false);
+  var v = 1*document.getElementById(s).value;
+  if (v) {
+    var dir = v < 0 ? -1 : 1;
+    var ltr = ' abcdefghijklmnopqrstuvwxyz'[v*dir];
+    makemove([dir,ltr]);
+  }
+  showstate(0);
+  makemove(sgplay());
+  window.setTimeout('showstate(1)',500);
+  return;
+}
+  
+var tabbeg='<input type="button" class="hidden" onfocus="document.getElementById(\'sr\')">'
+var tabend='<input type="button" class="hidden" onfocus="document.getElementById(\'sl\')">'
+
+var sletter0='<select id="sr" dir="ltr" onchange="umoved(\'sr\')">\
+              <option value=0>&nbsp</option>\
+              <option id="pass" value=0>-</option>\
+              <option value=1>a</option>\
+              <option value=2>b</option>\
+              <option value=3>c</option>\
+              <option value=4>d</option>\
+              <option value=5>e</option>\
+              <option value=6>f</option>\
+              <option value=7>g</option>\
+              <option value=8>h</option>\
+              <option value=9>i</option>\
+              <option value=10>j</option>\
+              <option value=11>k</option>\
+              <option value=12>l</option>\
+              <option value=13>m</option>\
+              <option value=14>n</option>\
+              <option value=15>o</option>\
+              <option value=16>p</option>\
+              <option value=17>q</option>\
+              <option value=18>r</option>\
+              <option value=19>s</option>\
+              <option value=20>t</option>\
+              <option value=21>u</option>\
+              <option value=22>v</option>\
+              <option value=23>w</option>\
+              <option value=24>x</option>\
+              <option value=25>y</option>\
+              <option value=26>z</option>\
+    </select>';
+
+var rtletter='<select id="sr" dir="ltr" onchange="umoved(\'sr\')">\
+              <option value=0>&nbsp</option>\
+              <option value=1>a</option>\
+              <option value=2>b</option>\
+              <option value=3>c</option>\
+              <option value=4>d</option>\
+              <option value=5>e</option>\
+              <option value=6>f</option>\
+              <option value=7>g</option>\
+              <option value=8>h</option>\
+              <option value=9>i</option>\
+              <option value=10>j</option>\
+              <option value=11>k</option>\
+              <option value=12>l</option>\
+              <option value=13>m</option>\
+              <option value=14>n</option>\
+              <option value=15>o</option>\
+              <option value=16>p</option>\
+              <option value=17>q</option>\
+              <option value=18>r</option>\
+              <option value=19>s</option>\
+              <option value=20>t</option>\
+              <option value=21>u</option>\
+              <option value=22>v</option>\
+              <option value=23>w</option>\
+              <option value=24>x</option>\
+              <option value=25>y</option>\
+              <option value=26>z</option>\
+    </select>';
+
+var ltletter='<select id="sl" dir="rtl" onchange="umoved(\'sl\')"> <option value=0>&nbsp</option>\
+              <option value=-1>a</option>\
+              <option value=-2>b</option>\
+              <option value=-3>c</option>\
+              <option value=-4>d</option>\
+              <option value=-5>e</option>\
+              <option value=-6>f</option>\
+              <option value=-7>g</option>\
+              <option value=-8>h</option>\
+              <option value=-9>i</option>\
+              <option value=-10>j</option>\
+              <option value=-11>k</option>\
+              <option value=-12>l</option>\
+              <option value=-13>m</option>\
+              <option value=-14>n</option>\
+              <option value=-15>o</option>\
+              <option value=-16>p</option>\
+              <option value=-17>q</option>\
+              <option value=-18>r</option>\
+              <option value=-19>s</option>\
+              <option value=-20>t</option>\
+              <option value=-21>u</option>\
+              <option value=-22>v</option>\
+              <option value=-23>w</option>\
+              <option value=-24>x</option>\
+              <option value=-25>y</option>\
+              <option value=-26>z</option>\
+    </select>';
+
+function showstate(p) {    // display current state
+  // p is 0 if it's computer's turn
+  // p is 1 if it's user's turn
+  document.getElementById('string').innerHTML = cs+'&nbsp;';
+  if (p) {
+    var n = cs.length;
+    if (!n) {
+      enableparamchange(true);
+      document.getElementById('string').innerHTML = cs+sletter0;
+    } else if (n<dv.length && dv[n][cs] && dv[n][cs][0] == 0) {
+      uwin();
+    } else if (sgmode > 0) {
+      document.getElementById('string').innerHTML = cs+rtletter;
+    } else {
+      document.getElementById('string').innerHTML = tabbeg+ltletter+cs+rtletter+tabend;
+    }
+    document.getElementById('sr').focus();
+  }  
+}
+
+function ichallenge() {    // computer challenges
+  var word = prompt('I challenge!\n'+(sgmode<0 ? '? ' : '')+cs+' ?',
+		    'Type your word here');
+  while (true) {
+    if (!word) {
+      break;
+    }
+    word.toLowerCase();  
+    if (word.search('[^a-z]') < 0) {    // legal word
+      if ((sgmode < 0) ? (word.search(cs) < 0) : (word.search(cs))) {
+	// but not a superstring of cs
+	word = prompt("That's not a possible continuation, try again",'Type your word here');
+	continue;
+      }
+      n = word.length;
+      if (n < minwordlength) {
+	word = prompt("That's too short, try again",'Type your word here');
+	continue;
+      }
+      if (n<dv.length && dv[n][word] && dv[n][word][0] == 0) {
+	// word is in dictionary
+	cs = word;
+	uwin();
+	return;
+      }
+      if (uwin(word)) {
+	return;
+      }
+      break;
+    }
+    word = prompt('Invalid input, try again','Type your word here');
+  }
+  alert("My challenge succeeds, so I win!");
+  resetgame();
+  return;
+}
+
+function iwin() {      // computer wins
+  alert("'"+cs+"'" + " is a word. I win!");
+  resetgame();
+}
+
+function uwin(word) {
+  if (word) {
+    if (word.length < minwordlength) {
+      alert("Too short!");
+      return false;
+    } else if (!confirm("'"+word+"' is not in the selected dictionary. Are you sure it's a word?")) {
+      return false;
+    }
+    addoneword(word);
+    var words = getcookie('words');
+    setcookie('words',words ? words+'.'+word : word);
+  } else {
+    word = cs;
+  }
+  alert("Congratulations! '"+word+"' is a word, so you win!");
+  resetgame();
+  return true;
+}
+
+function sgplay() {
+  var n=cs.length;     // length of current string
+  var dn=dv.length;    // length of dictionary vector
+  var d=n<dn?dv[n] : {};  // lookup dictionary
+  var x=d[cs];
+  if (x==null) {    // this has no continuation
+    ichallenge();
+    return x;
+  }
+  if (x[0]==0) {    // this is a word
+    iwin();    
+    return x;
+  }
+  var tries=[0,1,2,Infinity][document.getElementById('oplevel').value]*(sgmode+3)/2;
+  if (tries<Infinity) {
+    for (t=tries;t>=0;) {
+      var rd=(sgmode>0)?1:Math.floor(Math.random()*2)*2-1;
+      var rt='abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random()*26)];
+      var st=(rd<0)?rt+cs:cs+rt;
+      x=dv[n+1][st];
+      if (x!=null) {
+	x=[rd,rt,-x[2]];
+	if (x[2] > 0) {
+	  break;
+	}
+	t-=1;
+      }
+    }
+  }
+  return x;
+}
+
+function respond() {
+  var s=cs;
+  if (s) {
+    var n=cs.length;
+    var x;
+    while (n<dv.length) {
+      x=dv[n][s];
+      if (x && x[0]) {
+        s = (x[0] < 0) ? x[1]+s : s+x[1];
+        n+=1;
+      } else {
+        break;
+      }
+    }
+  } else if (dv) {
+    s = 'Game just starting!';
+  } else {
+    s = 'Waiting for game to load.';
+  }  
+  return s;
+}
+
+
+// for checking for error
+function errorfunc(status,err) {
+  alert('Error: status='+status+' err='+err);
+  document.getElementById('string').innerHTML = 'Select params and click Play to begin!';
+  sgmode = null;
+  minwordlength = null;
+  wordlistname = null;
+}
+
+// for beginning play
+function startgame(data) {
+  words = (getcookie('words') || '').split('.');
+  for (i in words) addword(words[i]);
+  massagedv();
+  resetgame();
+}
+
+function massagedv() {
+  var n;
+  for (n=dv.length;--n;) {
+    updateprevious(n);
+  }
+}
+
+function addword(s) {    // s is a word
+  var n;
+  var i;
+  var j;
+  var sss;
+  var ss;
+
+  if (s.match('[^a-z]')) return 0;    // only all-lower-case words allowed
+  n = s.length;
+  if (n < minwordlength) return 0;    // ignore too-short words
+  for (i=dv.length;i<=n;i++) dv.push({});
+  dv[n][s] = [0,'',n];
+  return n;
+}
+
+function updateprevious(n) {
+  var s;
+  var ss;
+  var v;
+  var i;
+  var x;
+
+  for (s in dv[n]) {
+    ss = s.slice(0,-1);
+    v = -dv[n][s][2];
+    x = dv[n-1][ss];
+    if (!x || (x[2]<0 && (v>0 || v<x[2])) || (v>0 && v<x[2]))
+      dv[n-1][ss] = [1,s.slice(-1),v];
+    if (sgmode<0) {
+      ss = s.slice(1);
+      x = dv[n-1][ss];
+      if (!x || (x[2]<0 && (v>0 || v<x[2])) || (v>0 && v<x[2]))
+	dv[n-1][ss] = [-1,s[0],v];
+    }
+  }
+}
+
+function addoneword(s) {    // s is a word    // could be way more efficient!
+  n = addword(s);
+  for (n++;--n;) updateprevious(n);
+} 
+
+function getparams() {
+  return {sgmode:1*document.getElementById("sgmode").value,
+	  minwordlength:1*document.getElementById("minwordlength").value,
+	  wordlistname:document.getElementById("wordlist").value};
+}
+
+function setparams(params) {
+  minwordlength = params.minwordlength;
+  sgmode = params.sgmode;
+  wordlistname = params.wordlistname;
+}
+
+function disablemove() {
+  document.getElementById("sr").disabled=true;
+}
+
+function enableparamchange(tf) {
+  document.getElementById("sgmode").disabled=!tf;
+  document.getElementById("minwordlength").disabled=!tf;
+  document.getElementById("wordlist").disabled=!tf;
+}
+
+function play() {    // callback from "Play" button
+  enableparamchange(false);
+  var params = getparams();
+  if (sgmode == params.sgmode &&
+      minwordlength == params.minwordlength &&
+      wordlistname == params.wordlistname) {    // params haven't changed
+    if (cs && !confirm("Start new game?")) return;
+    return resetgame();
+  }
+  document.getElementById('string').innerHTML='Game loading';
+  setparams(params);
+  dv = [];
+  loadwords(wordlistname.split('+'));
+}
+
+// for displaying challenge response
+function uchallenge() {
+  document.getElementById("response").innerHTML=respond();
+}
+function unchallenge() {
+  document.getElementById("response").innerHTML="&nbsp";
+}
+
+function loadwords(dicts) {  
+  var c = dicts.slice(1);
+  loadDict(dicts[0],function(){c.length ? loadwords(c) : startgame();});
+}
+
+function loadDict(dictname,continuation) {
+  var xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function () {
+    if (this.readyState==4) {
+	if (this.status==200) {
+	  var data = this.responseText.split(/\s+/);
+	  var d;
+	  for (d in data) addword(data[d]);    // add each long-enough word into dv
+	  continuation();
+	} else {
+	  errorfunc(this.status,'Loading Failed');
+	}
+    }
+  };
+  xhttp.open('GET',dictname,true);
+  xhttp.send();
+}
+
+</script>
+</head>
+<body>
+<h1>SUPERGHOST</h1>
+<table class="center" cellspacing=12pt><tr>
+<td>Game type: 
+<select id="sgmode" name="sgmode" onchange="disablemove()">
+    <option selected value=1>ghost</option>
+    <option value=-1>superghost</option>
+</select>
+</td>
+<td>Minimum word length:
+<select id="minwordlength" name="minwordlength" onchange="disablemove()">
+  <option value=3>3</option>
+  <option selected value=4>4</option>
+  <option value=5>5</option>
+  <option value=6>6</option>
+  <option value=7>7</option>
+  <option value=8>8</option>
+  <option value=9>9</option>
+</select>
+</td>
+<td>Word list:
+<select id="wordlist" name="wordlist" onchange="disablemove()">
+    <option value="wordlist">wordlist</option>
+    <option value="wordlist+SIwordlist">wordlist+SI</option>
+<select>
+</td>
+<!--
+<td>Play mode:
+<select id="playmode" name="playmode">
+    <option selected value=0>With Computer</option>
+    <option value=1 disabled>With Person</option>
+    <option value=2 disabled>Multiplayer</option>
+</select>
+</td>
+-->
+</tr></table>
+<table class="center" cellspacing=24pt><tr>
+<td>My level:
+<select id="mylevel" name="mylevel">
+  <option value=0>novice</option>
+  <option value=1>so-so</option>
+  <option selected value=2>good</option>
+  <option value=3>expert</option>
+</select>
+</td>
+<td>Opponent level:
+<select id="oplevel" name="oplevel">
+  <option value=0>novice</option>
+  <option value=1>so-so</option>
+  <option selected value=2>good</option>
+  <option value=3>expert</option>
+</select>
+</td>
+</tr></table>
+<p>
+<input type="button" value="Play" onclick="play()">
+</p>
+<div id="string" class="letter" style="color:red"> Select params and click Play to begin! </div>
+<table class="center">
+<tr><td id="response" class="letter">&nbsp</td></tr>
+<tr><td><input type="button" value="Challenge" onmousedown="uchallenge()" onmouseup="unchallenge()" onmouseout="unchallenge()"></td></tr>
+<tr><td><input type="button" value="That's a word!" onclick="uwin(cs)"</td></tr>
+</table>
+</body>
+</html>
