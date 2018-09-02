@@ -219,8 +219,9 @@ function showstate(p) {    // display current state
 }
 
 function ichallenge() {    // computer challenges
-  var word = prompt('I challenge!\n'+(sgmode<0 ? '? ' : '')+cs+' ?',
-		    'Type your word here');
+  var q = (sgmode<0 ? '? ' : '')+cs+' ?';
+  var p = 'Type your word here';
+  var word = prompt('I challenge!\n'+q,p);
   while (true) {
     if (!word) {
       break;
@@ -229,12 +230,12 @@ function ichallenge() {    // computer challenges
     if (word.search('[^a-z]') < 0) {    // legal word
       if ((sgmode < 0) ? (word.search(cs) < 0) : (word.search(cs))) {
 	// but not a superstring of cs
-	word = prompt("That's not a possible continuation, try again",'Type your word here');
+	word = prompt("That's not a possible continuation, try again\n"+q,p);
 	continue;
       }
       n = word.length;
       if (n < minwordlength) {
-	word = prompt("That's too short, try again",'Type your word here');
+	word = prompt("That's too short, try again\n"+q,p);
 	continue;
       }
       if (n<dv.length && dv[n][word] && dv[n][word][0] == 0) {
@@ -248,7 +249,7 @@ function ichallenge() {    // computer challenges
       }
       break;
     }
-    word = prompt('Invalid input, try again','Type your word here');
+    word = prompt('Invalid input, try again\n'+q,p);
   }
   alert("My challenge succeeds, so I win!");
   resetgame();
