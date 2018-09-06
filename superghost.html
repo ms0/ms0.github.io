@@ -100,9 +100,10 @@ function umoved(s) {    // user has moved (callback from select)
     makemove([dir,ltr]);
   }
   showstate(0);
-  makemove(sgplay());
-  window.setTimeout('showstate(1)',500);
-  return;
+  setTimeout(function () {
+    makemove(sgplay());
+    setTimeout('showstate(1)',500);
+  },50);
 }
   
 var tabbeg='<input type="button" class="hidden" onfocus="document.getElementById(\'sr\')">'
