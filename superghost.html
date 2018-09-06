@@ -209,7 +209,7 @@ function showstate(p) {    // display current state
       enableparamchange(true);
       document.getElementById('string').innerHTML = cs+sletter0;
     } else if (n<dv.length && dv[n][cs] && dv[n][cs][0] == 0) {
-      uwin();
+      setTimeout(uwin,50);
     } else if (sgmode > 0) {
       document.getElementById('string').innerHTML = cs+rtletter;
     } else {
