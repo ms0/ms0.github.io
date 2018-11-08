@@ -1,0 +1,73 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+
+<script>
+// adapted from https://stackoverflow.com/questions/34708980/generate-sine-wave-and-play-it-in-the-browser#
+
+window.AudioContext = window.AudioContext || window.webkitAudioContext;
+
+var context = new AudioContext();
+
+function playSound() {
+  var te = document.getElementById('freq');
+  var tone = parseFloat(te.value);
+  if (tone < 10 || tone > context.sampleRate/2 || tone != tone) {
+    te.style.backgroundColor = 'pink';
+    return;
+  }
+  te.style.backgroundColor='white';
+
+  var ve = document.getElementById('vol');
+  var volume = parseFloat(ve.value);
+  if (volume <= 0 || volume > 1) {
+    ve.style.backgroundColor = 'pink';
+    return;
+  }
+  ve.style.backgroundColor = 'white';   
+
+  var se = document.getElementById('dur');
+  var seconds = parseFloat(se.value);
+  if (seconds < .1 || seconds > 60 || seconds != seconds) {
+    se.style.backgroundColor = 'pink';
+    return;
+  }
+  se.style.backgroundColor = 'white';   
+
+  var arr = [];
+
+  for (var i = 0; i < context.sampleRate * seconds; i++) {
+    arr[i] = sineWaveAt(i, tone) * volume;
+  }
+
+  var buf = new Float32Array(arr.length)
+  for (var i = 0; i < arr.length; i++) buf[i] = arr[i]
+  var buffer = context.createBuffer(1, buf.length, context.sampleRate)
+  buffer.copyToChannel(buf, 0)
+  var source = context.createBufferSource();
+  source.buffer = buffer;
+  source.connect(context.destination);
+  source.start(0);
+}
+
+function sineWaveAt(sampleNumber, tone) {
+  var sampleFreq = context.sampleRate / tone;
+  return Math.sin(sampleNumber / (sampleFreq / (Math.PI*2)));
+}
+
+</script>
+</head>
+<body>
+<h1 style="text-align:center">Play a Tone</h1>
+<p style="text-align:center">
+<label for='freq'>Frequency:</label>
+<input id='freq' title="Enter frequency in Hz" placeholder="frequency" onChange="playSound()">
+ 
+<label for='vol'>&nbsp;Volume:</label>
+<input id='vol' title="Enter volume between 0 and 1" placeholder="volume" onChange="playSound()" value=".2">
+ 
+<label for='dur'>&nbsp;Duration:</label>
+<input id='dur' title="Enter duration in seconds" placeholder="duration" onChange="playSound()" value=
+".5">
+</p>
+</html>
