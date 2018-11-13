@@ -12,9 +12,40 @@ var tone = 440;
 var volume = .2;
 var seqno=0;
 var sources={};
+var A4 = 440;
+
+function setA4(ae) {
+  var t = parseFloat(ae.value);
+  if (t < 220 || t > 880 || t != t) {
+    ae.style.backgroundColor = 'pink';
+  } else {
+    ae.style.backgroundColor = 'white';
+    A4 = t;
+    enterFrequency(document.getElementById('freq'));
+  }
+}
 
 function enterFrequency(te) {
-  tone = parseFloat(te.value);
+  var t = te.value.trim();
+  var c = t[0].toLowerCase().charCodeAt() - 'a'.charCodeAt();
+  if (c >= 0 && c <= 6) {
+    var d = [0,2,-9,-7,-5,-4,-2][c]
+    while (t = t.slice(1).trim()) {
+      if (t[0] == 'b') {
+	d -= 1;
+	continue;
+      } else if (t[0] == '#') {
+	d += 1;
+	continue;
+      }
+    }
+    var e = parseInt(t);
+    if (e == e) d += 12*(e-4);
+    tone = A4*2**(d/12);
+  }
+  else {
+    tone = parseFloat(t);
+  }
   if (tone < 10 || tone > context.sampleRate/2 || tone != tone) {
     te.style.backgroundColor = 'pink';
     tone = null;
@@ -50,6 +81,7 @@ function playSound() {
 
 function stopSound(n) {
   sources[n].stop();
+  delete sources[n];
   var o = document.getElementById(n);
   o.parentNode.removeChild(o);
 }
@@ -63,9 +95,10 @@ td {text-align:center;}
 </head>
 <body>
 <h1 style="text-align:center">Play Tones</h1>
+<label for='a'>Frequency of A4</label> <input id='a' title="Enter frequency of A4" placeholder="A4 frequency" onChange="setA4(this)" value="440">
 <table id='table'>
 <tr>
-  <td><input id='freq' title="Enter frequency in Hz" placeholder="frequency" onChange="enterFrequency(this)" value="440"></td>
+  <td><input id='freq' title="Enter frequency in Hz, or note symbol (A-G, optional # or b, optional octave number)" placeholder="frequency" onChange="enterFrequency(this)" value="440"></td>
   <td><input id='vol' title="Enter volume between 0 and 1" placeholder="volume" onChange="enterVolume(this)" value=".2"></td>
   <td><button id='ok' type='button' onClick="playSound()">Play</button></td>
 </tr>
