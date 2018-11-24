@@ -868,6 +868,10 @@ function speedtoggle(e) {
 
 */
 
+function pointsEqual(a,b) {
+  return a.every(function (e,x) {return e == b[x];});
+}
+
 function alterWall() {
   if (selectedItem[0]==WALL) changeWall();
   return false;
@@ -1132,6 +1136,15 @@ function update() {
       }
     }
     if (ctype < Infinity) {
+      if (sound) {
+	if (!frozenSelection ||
+	    (selectedItem[0] == WALL ?
+	     (ctype == 0 && (pointsEqual(walls[selectedItem[1]].x[0],c0) ||
+			     pointsEqual(walls[selectedItem[1]].x[1],c0)) ||
+	      ctype == 1 && walls[selectedItem[1]]===c0) : 
+	     (balls[selectedItem[1]]===b0 || ctype==2 && balls[selectedItem[1]]===c0)))
+	  playSound(click);
+      }
       updateby(s*tc);   // simulation time elapsed
       // update velocities of colliding balls
       switch(ctype) {
@@ -1178,6 +1191,46 @@ function update() {
   updateby(s*(TIMESTEP-tt));    // update positions to end of step
 }
 </script>
+
+<script>
+window.AudioContext = window.AudioContext || window.webkitAudioContext;
+var context;
+var click;
+var sound;
+
+function setSound(e) {
+  sound = e.value*1;
+  if (sound) {
+    context = context || new AudioContext();
+    click = click || makeWave(10,1/60,1);
+  }
+}
+
+function makeWave(freq,dur,amp) {
+  var l = context.sampleRate*dur;
+  var arr = new Float32Array(l);
+  for (var i=0; i < context.sampleRate*dur; i++) {
+    arr[i] = waveAt(i,freq)*amp;
+  }
+  return arr;
+}
+
+function waveAt(i,freq) {
+  var sf = context.sampleRate/freq;
+  var phase = 2*Math.PI*i/sf;
+  return Math.sin(phase)+Math.sin(3*phase)/3+Math.sin(5*phase)/5;
+}
+
+function playSound(a) {
+  var buffer = context.createBuffer(1,a.length, context.sampleRate);
+  buffer.copyToChannel(a,0);
+  var source = context.createBufferSource();
+  source.buffer = buffer;
+  source.connect(context.destination);
+  source.start(0);
+}
+</script>
+
 <style type="text/css">
 table.center {margin-left:auto;margin-right:auto}
 p.center {text-align:center}
@@ -1219,7 +1272,12 @@ function reposition(e) {
 <input type="file" id="loadFile" onChange="loadFiles(id)"/>
 <button type="button" id="save2window" onClick="save2popup()">SHOW AS TEXT</button>
 </p>
-<p>&nbsp</p>
+<p class="center"><label for='sound'>Sound:</label>
+<select id='sound' onChange="setSound(this)">
+<option value='0'>off</option>
+<option value='1'>clicks</option>
+</select>
+</p>
 <p class="center">Ball</p>
 <table class="center">
 <tr>
