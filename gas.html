@@ -1210,9 +1210,11 @@ function makeWave(freq,dur,amp) {
   var l = context.sampleRate*dur;
   var arr = new Float32Array(l);
   for (var i=0; i < context.sampleRate*dur; i++) {
-    arr[i] = waveAt(i,freq)*amp;
+    arr[i] = waveAt(l-1-i,freq)*amp;
   }
-  return arr;
+  var buffer = context.createBuffer(1,l,context.sampleRate);
+  buffer.copyToChannel(arr,0);
+  return buffer;
 }
 
 function waveAt(i,freq) {
@@ -1222,10 +1224,8 @@ function waveAt(i,freq) {
 }
 
 function playSound(a) {
-  var buffer = context.createBuffer(1,a.length, context.sampleRate);
-  buffer.copyToChannel(a,0);
   var source = context.createBufferSource();
-  source.buffer = buffer;
+  source.buffer = a;
   source.connect(context.destination);
   source.start(0);
 }
