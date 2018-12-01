@@ -1136,15 +1136,6 @@ function update() {
       }
     }
     if (ctype < Infinity) {
-      if (sound) {
-	if (!frozenSelection ||
-	    (selectedItem[0] == WALL ?
-	     (ctype == 0 && (pointsEqual(walls[selectedItem[1]].x[0],c0) ||
-			     pointsEqual(walls[selectedItem[1]].x[1],c0)) ||
-	      ctype == 1 && walls[selectedItem[1]]===c0) : 
-	     (balls[selectedItem[1]]===b0 || ctype==2 && balls[selectedItem[1]]===c0)))
-	  playSound(click);
-      }
       updateby(s*tc);   // simulation time elapsed
       // update velocities of colliding balls
       switch(ctype) {
@@ -1184,6 +1175,41 @@ function update() {
 	break;
       }
       tt += tc;    // update real time elapsed since start of step
+      if (sound &&
+	  (!frozenSelection ||
+	   (selectedItem[0] == WALL ?
+	    (ctype == 0 && (pointsEqual(walls[selectedItem[1]].x[0],c0) ||
+			    pointsEqual(walls[selectedItem[1]].x[1],c0)) ||
+	     ctype == 1 && walls[selectedItem[1]]===c0) : 
+	    (balls[selectedItem[1]]===b0 || ctype==2 && balls[selectedItem[1]]===c0)))) {
+	  var x,y;    // collision point
+	  switch (ctype) {
+	  case 0:
+	    x = c0[0];
+	    y = c0[1];
+	    break;
+	  case 1:
+	    var d = (c0.dx[0]*(b0.x[0]-c0.x[1][0]) + c0.dx[1]*(b0.x[1]-c0.x[1][1]))/c0.l2;
+	    x = c0.x[1][0] + c0.dx[0]*d;
+	    y = c0.x[1][1] + c0.dx[1]*d;
+	    break;
+	  case 2:
+	    if (b0.r < c0.r) x = c0, c0 = b0, b0 = x;    // make b0 the bigger ball
+	    dx = b0.x[0] - c0.x[0];
+	    dy = b0.x[1] - c0.x[1];
+	    if (dx*dx+dy*dy < b0.r*b0.r) {  // inside
+	      var d = b0.r-c0.r;
+	      x = ((b0.r-2*c0.r)*c0.x[0] + c0.r*b0.x[0])/d;
+	      y = ((b0.r-2*c0.r)*c0.x[1] + c0.r*b0.x[1])/d;
+	    } else {
+	      var d = b0.r+c0.r;
+	      x = (b0.r*c0.x[0] + c0.r*b0.x[0])/d;
+	      y = (b0.r*c0.x[1] + c0.r*b0.x[1])/d;
+	    }
+	    break;
+	  }
+	  playSound(click,x,y);
+      }
       continue;
     }
     break;
@@ -1223,10 +1249,22 @@ function waveAt(i,freq) {
   return Math.sin(phase)+Math.sin(3*phase)/3+Math.sin(5*phase)/5;
 }
 
-function playSound(a) {
+function playSound(a,x,y) {
   var source = context.createBufferSource();
   source.buffer = a;
-  source.connect(context.destination);
+  var pannode = context.createPanner();
+  pannode.panningModel='HRTF';
+  pannode.distanceModel = 'inverse';
+  pannode.refDistance = GASSIZE;
+  pannode.maxDistance = 2*GASSIZE;
+  pannode.rolloffFactor = 1;
+  pannode.coneInnerAngle = 360;
+  pannode.coneOuterAngle = 0;
+  pannode.coneOuterGain = 0;
+  pannode.setOrientation(0,0,1);
+  pannode.setPosition(x,y,-GASSIZE);
+  source.connect(pannode);
+  pannode.connect(context.destination);
   source.start(0);
 }
 </script>
