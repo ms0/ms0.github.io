@@ -1,0 +1,78 @@
+% binary-based birthday finder
+% from Magic House of Numbers by Irving and Peggy Adler
+% 5 sheets, 10 pages to be printed double-sided flipped on long edge
+% gray areas to be cut out
+
+/inch {72 mul} bind def
+/S 6.5 inch def
+/shift {2 exch exp mul floor cvi} bind def
+/rshift {neg shift} bind def
+
+/translate2center
+{currentpagedevice /PageSize get aload pop .5 mul exch .5 mul exch translate}
+bind def
+
+/centershow
+{gsave dup stringwidth pop -.5 mul 0 rmoveto show grestore} bind def
+
+/rightshow
+{gsave dup stringwidth pop neg 0 rmoveto show grestore} bind def
+
+/leftshow
+{gsave show grestore} bind def
+
+% 16 numbers per page
+% page slots are arranged as 8 rows by 4 columns
+
+/X S 4 div def
+/Y S 8 div def
+
+% lower left corner of slot <r,c> is at <(c-2)X,(3-r)Y>
+% center of slot <x,y> is at <(c-1.5)X,(3.5-r)Y>
+
+% if we number number slots from 0 to 15, slot k is <k%2,k/2+2*(k/16)>
+
+/writenum {    % slot number
+  10 dict begin
+  /n exch def
+  /s exch def
+  /c s 2 mod s 8 idiv 2 mul add def
+  /r s 2 idiv def
+  c 1.5 sub X mul 3.5 r sub Y mul 15 sub moveto n (  ) cvs centershow  
+  end
+} bind def
+
+0 1 4 {
+  /b exch def    % bit number
+  translate2center
+  S 1.5 inch add dup dup -.5 mul dup 4 2 roll rectstroke
+  /Helvetica-Bold 30 selectfont
+  gsave .75 setgray
+  {{0 0 X Y 4 mul rectfill X -2 mul Y -4 mul X Y 4 mul rectfill}
+   {0 0 X 2 mul Y rectfill 0 Y 2 mul X 2 mul Y rectfill
+    X -2 mul Y -2 mul X 2 mul Y rectfill X -2 mul Y -4 mul X 2 mul Y rectfill}
+   {0 0 X 2 mul Y 2 mul rectfill X -2 mul Y -4 mul X 2 mul Y 2 mul rectfill}
+   {0 0 X -2 mul Y -4 mul rectfill}
+   {}
+  } b get exec grestore
+  S -.5 mul S .5 mul 15 add moveto (YES) leftshow
+  S -.5 mul S -.5 mul S S rectstroke
+  /s 0 def
+  0 1 31 {
+    /n exch def  % date
+    n b rshift 1 and 1 eq {s n writenum /s s 1 add store} if 
+  } for
+  b 4 eq {90 rotate S .5 mul dup 15 add moveto (NO) rightshow
+          showpage translate2center /Helvetica-Bold 30 selectfont /s 0 def
+          0 1 31 {/n exch def  % date
+	          n b rshift 1 and 1 eq {s n writenum /s s 1 add store} if 
+	  } for
+	  -90 rotate /s 1 def
+          1 1 31 {/n exch def  % date
+	          n b rshift 1 and 1 ne {s n writenum /s s 1 add store} if 
+	  } for
+         }
+         {180 rotate S -.5 mul S .5 mul 15 add moveto (NO) leftshow showpage} ifelse
+  showpage  
+} for 
+
