@@ -368,6 +368,31 @@ var gcontext;
 var walls = [];    // array of walls
 var balls = [];    // array of balls
 
+var energy = 0;    // total energy (finite masses only)
+var mass = 0;      // total mass (finite masses only)
+var pref = 0;      // reference momentum = sqrt(2*energy*mass)/N
+
+function getEnergy() {
+  var n = 0;    // number of finite masses
+  var m;
+  var v0;
+  var v1;
+  energy = 0;
+  mass = 0;
+  for (var b in balls) {
+    m = balls[b].m;
+    if (isFinite(m)) {
+      v0 = balls[b].v[0];
+      v1 = balls[b].v[1];
+      n += 1;
+      mass += m;
+      energy += m*(v0*v0+v1*v1);
+    }
+  }
+  pref = Math.sqrt(energy*mass)/n;
+  energy *= .5;
+}
+
 function setPosition(e) {
   if (frozenSelection)
     return null;
@@ -743,6 +768,7 @@ function setstep() {
 
 function gostop() {
   if (!stop()) {
+    getEnergy();
     timer = setInterval(step,1000*TIMESTEP);
   } 
   setstep();
@@ -975,6 +1001,7 @@ function makeBall(d) {
 }
 
 function step() {
+  getEnergy();
   update();
   selectItem();
   draw();
@@ -1054,6 +1081,7 @@ function update() {
   var mb;
   var mc;
   var M;
+  var dp;    // absolute value of momentum transfer
 
   var t;
   var s = speed;
@@ -1144,6 +1172,7 @@ function update() {
 	tv = 2*(b0.v[0]*r[0]+b0.v[1]*r[1])/(b0.r*b0.r);
 	b0.v[0] -= tv*r[0];
 	b0.v[1] -= tv*r[1];
+	dp = b0.m*Math.abs(tv)*r;
 	break;
 
       case 1:    // ball - wall
@@ -1151,6 +1180,7 @@ function update() {
 	tv = 2*(b0.v[0]*dx[1]-b0.v[1]*dx[0])/c0.l2;
 	b0.v[0] -= tv*dx[1];
 	b0.v[1] += tv*dx[0];
+	dp = b0.m*Math.abs(tv)*c0.l;
 	break;
 
       case 2:    // ball - ball
@@ -1172,6 +1202,7 @@ function update() {
 	tvm = tv*mb;
 	c0.v[0] -= rx[0]*tvm;
 	c0.v[1] -= rx[1]*tvm;
+	dp =  (mc ? b0.m*mc : c0.m*mb)*Math.abs(tv)*(b0.r+c0.r)
 	break;
       }
       tt += tc;    // update real time elapsed since start of step
@@ -1208,7 +1239,7 @@ function update() {
 	    }
 	    break;
 	  }
-	  playSound(click,x,y);
+	  playSound(click,x,y,dp/pref);
       }
       continue;
     }
@@ -1249,13 +1280,23 @@ function waveAt(i,freq) {
   return Math.sin(phase)+Math.sin(3*phase)/3+Math.sin(5*phase)/5;
 }
 
-function playSound(a,x,y) {
+function playSound(a,x,y,v) {
   var source = context.createBufferSource();
   source.buffer = a;
   var pannode = context.createPanner();
+  var gainnode = 0;
+  if (v < 1) {
+    gainnode = context.createGain();
+    gainnode.gain.value = v;
+    source.connect(gainnode);
+    gainnode.connect(pannode);
+  } else {
+    source.connect(pannode);
+  }
   source.onended = function () {
     source.disconnect();
     pannode.disconnect();
+    gainnode && gainnode.disconnect();
   };
   pannode.panningModel='HRTF';
   pannode.distanceModel = 'inverse';
@@ -1271,7 +1312,6 @@ function playSound(a,x,y) {
   pannode.positionX.value = x;
   pannode.positionY.value = y;
   pannode.positionZ.value = -GASSIZE;
-  source.connect(pannode);
   pannode.connect(context.destination);
   source.start(0);
 }
