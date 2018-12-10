@@ -1306,12 +1306,8 @@ function playSound(a,x,y,v) {
   pannode.coneInnerAngle = 360;
   pannode.coneOuterAngle = 0;
   pannode.coneOuterGain = 0;
-  pannode.orientationX.value = 0;
-  pannode.orientationY.value = 0;
-  pannode.orientationZ.value = 1;
-  pannode.positionX.value = x;
-  pannode.positionY.value = y;
-  pannode.positionZ.value = -GASSIZE;
+  pannode.setOrientation(0,0,1);
+  pannode.setPosition(x,y,-GASSIZE);
   pannode.connect(context.destination);
   source.start(0);
 }
