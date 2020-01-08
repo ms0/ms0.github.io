@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html>
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width">
+<link rel="shortcut icon" href="mylogo.ico"/>
+<script>
+var n;    // number of qubits
+var N;    // 2**n
+var state;    // amplitudes of each qubit combo, each a complex number
+var marks;    // indices into state
+var qtx;    // context for qubits
+var qx;    // position of qubit canvas
+var qy;
+var ctx;    // context for combos
+var cx;    // position of combo canvas
+var cy;
+var butdiv;
+var dosdiv;
+var allbtn;
+var pw;    // popup window
+
+var combos = [];    // selected combos
+var qubits = [];    // selected qubits
+
+var F=16;    // font size
+var R=32;    // radius of amplitude circles
+var W=1024;  // width of canvas
+var X=Math.floor(W/2/R);    // number of qubits per row
+var dY=2*R+2*F;    // distance between swaths
+
+function clearcontext(c) {
+  c.clearRect(0,0,c.canvas.width,c.canvas.height);
+}
+
+function sigmoid(x) {
+  var SK=1;    // deriv at +-1 = 2*SK+1; at .5 = 0, or 1 if SK=0
+  return (2*x-1)**(2*SK+1)*.5+.5;
+}
+
+function showstate() {
+  pw && save2popup();
+  var i;
+  var p;
+  clearcontext(qtx);
+  qtx.lineCap="round";
+  qtx.lineJoin="round";
+  qtx.textAlign="center";
+  qtx.font=F+"px Arial";
+  for (i=0; i<n; i++) {    // show probabilities for each bit
+    qtx.fillText(i.toString(16).toUpperCase(),R+i*2*R,R+F);
+    p = prob(i);
+    if (p) {
+      p = 1-p;
+      qtx.beginPath();
+      qtx.moveTo(R+i*2*R,R);
+      qtx.lineTo(R+i*2*R,p*R);
+      qtx.lineWidth = 3;
+      qtx.strokeStyle = 'black';
+      qtx.stroke();
+      var q = sigmoid(p);
+      qtx.beginPath();
+      qtx.moveTo(R+i*2*R,0);
+      qtx.lineTo(R+i*2*R,q*R);
+      qtx.lineWidth = 1;
+      qtx.strokeStyle = 'white';
+      qtx.stroke();
+      qtx.beginPath();
+      qtx.moveTo(R+i*2*R,R);
+      qtx.lineTo(R+i*2*R,q*R);
+      qtx.lineWidth = 1;
+      qtx.strokeStyle = 'lightgray';
+      qtx.stroke();
+    }
+  }
+  clearcontext(ctx);
+  ctx.lineCap="round";
+  ctx.lineJoin="round";
+  ctx.textAlign="center";
+  ctx.font=F+"px Arial";
+  for (i=0; i<N; i++) {    // show state of each bit combo
+    var x = i%X;
+    var y = (i-x)/X;
+    var a = cabs(state[i]);
+    ctx.beginPath();
+    ctx.arc(x*2*R+R,y*dY+R,R,0,Math.PI*2,true);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'black';
+    ctx.stroke();
+    ctx.fillText(i.toString(16).toUpperCase(),x*2*R+R,y*dY+2*R+F);
+    if (a) {
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(x*2*R+R,y*dY+R,a*R,0,Math.PI*2,true);
+      ctx.fillStyle = 'black';
+      ctx.fill();
+      var b = sigmoid(a);
+      var u = state[i][0]/a;
+      var v = state[i][1]/a;
+      ctx.beginPath();
+      ctx.moveTo(x*2*R+R,y*dY+R);
+      ctx.lineTo(x*2*R+(1+u*b)*R,y*dY+(1-v*b)*R);
+      ctx.strokeStyle = 'white';
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x*2*R+(1+u*b)*R,y*dY+(1-v*b)*R);
+      ctx.lineTo(x*2*R+(1+u)*R,y*dY+(1-v)*R);
+      ctx.strokeStyle = 'black';
+      ctx.stroke();
+    }
+  }
+  dobuttons();
+}
+
+function dobuttons() {
+  Array.prototype.forEach.call(
+    dosdiv.children,
+    function(o,i){
+      var t = o.textContent;
+      var b = t.slice(0,4);
+      var c = t.slice(t.length-4);
+      o.disabled =
+	c=='Mark' ?
+	  b==c ? marked(lindex) : (b=='Redo' ? nextmark()<=lindex : prevmark()>=lindex) :
+        b=='Redo' ? lindex>=oplog.length : !lindex;
+    });
+  Array.prototype.forEach.call(
+    butdiv.children,
+    function(o,i){
+      var a = opdict[o.textContent][2];
+      o.disabled = (a > n || a < -N);
+    });
+  allbtn.disabled = true;
+}
+
+function save2popup(o) {
+  o && o.blur();
+  var title = document.getElementById('title').value;
+  pw = pw || window.open('',title,'height=512,width=64,resizable=1,scrollbars=1');
+  var d = pw.document;
+  var s = d.body.scrollTop;
+  d.body.innerHTML='';
+  var x = '<html><head><title>'+title+'</title><style>p{font-family:"Lucida Console";font-size:9pt;text-align:left;line-height:9pt;margin:0;}hr{padding:0px;margin:0px;}</style></head><body>';
+  var i;
+  var j=0;    // index into marks
+  for (i=0; i<=oplog.length; i++) {
+    if (i==lindex) x += '<hr>';
+    if (j < marks.length && marks[j]==i) {
+      x += '<p>Mark</p>';
+      j++;
+    }
+    if (i == oplog.length) {
+      while (i-- > lindex) x += '<p>Undo</p>';
+      break;
+    }
+    var o = oplog[i];
+    x += '<p>'+o[0];
+    var m=Math.abs(opdict[o[0]][2]);
+    for (var k=0; k<m; k++) x += ' '+o[1][k].toString(16).toUpperCase();
+    x += '</p>';
+  }
+  x += '</body></html>';
+  d.write(x);
+  d.close();
+  pw.focus();
+  var e;
+  var o = d.getElementsByTagName('hr')[0];
+  try {o.scrollIntoViewIfNeeded({behavior:'smooth',block:'center'});}
+  catch (e) {
+    var p = o.parentElement;
+    var y = o.offsetTop;
+    var h = p.clientHeight;
+    var y0 = s;
+    p.scrollTo(0,(y <= y0 || y >= y0+h) ? y-h/2 : s);
+  };
+}
+
+function loadFiles(o) {
+  var files = o.files;
+  var i;
+  var f;
+  for (i=0; i < files.length; i++) {
+    var r = new FileReader();
+    r.onloadend = (function(file,o) {
+      return function(e) {
+	loadFile(file,o,e.target.result);
+      }
+    })(files[i],o);
+    r.onerror = function (e) {alert('Read failed!');};
+    r.readAsText(files[i]);
+  }
+  o.value = '';
+}
+
+function loadFile(f,o,s) {
+  document.getElementById('title').value = f.name.replace(/\.\w*$/,'');
+  var op;
+  var lines=s.split("\n");
+  var l;
+  var e;
+  var a;
+  var x;
+  var j;
+  init(1);
+  for (var i in lines) {
+    l = lines[i].replace(/^\s*/,"").replace(/\s*$/,"");
+    if (l.length == 0) continue;
+    l = l.split(/\s/);
+    pop = l[0];
+    op = opdict[pop];
+    if (!op) {
+      if (pop == 'Mark') mark();
+      else if (pop == 'Undo') undo();
+      continue;
+    }
+    args = l.slice(1).map(function (x) {return parseInt(x,16);});
+    if (Math.abs(op[2]) == args.length) {
+      m = op[2] < 0 ? N : n;
+      e = 0;
+      for (j in args) {
+	if (args[j] < 0 || args[j] >= m) {
+	  e++;
+	  break;
+	}
+      }
+      a = args.slice();
+      a.sort();
+      for (x=a[0], j=1; j<a.length; j++) {
+	if (x < a[j]) x = a[j];
+	else {
+	  e++;
+	  break;
+	}
+      }
+      if (!e) dodo(pop,args);
+    }
+  }
+  clearbuttons(o);
+}
+
+// complex arithmetic:
+
+function complex(a,b) {
+  return [a||0,b||0];
+}
+
+function cneg(x) {
+  return [-x[0],-x[1]];
+}
+
+function conj(x) {
+  return [x[0],-x[1]];
+}
+
+function cadd(a,b) {
+  return [a[0]+b[0],a[1]+b[1]];
+}
+
+function csub(a,b) {
+  return [a[0]-b[0],a[1]-b[1]];
+}
+
+function cmul(a,b) {
+  return [a[0]*b[0]-a[1]*b[1],a[0]*b[1]+a[1]*b[0]];
+}
+
+function cmulr(a,r) {    // multiply in place by real r
+  a[0]*=r;
+  a[1]*=r;
+  return a;
+}
+
+function cmuli(a,r) {    // multiply in place by ir
+  var t = a[1]*r;
+  a[1] = a[0]*r;
+  a[0] = -t;
+  return a;
+}
+
+function cmulc(a,b) {    // multiply in place by complex b
+  var r = a[0]*b[0]-a[1]*b[1];
+  a[1] = a[0]*b[1]+a[1]*b[0];
+  a[0] = r;
+  return a;
+}
+
+function cdiv(a,b) {
+  var d = b[0]*b[0]+b[1]*b[1];
+  return [(a[0]*b[0]+a[1]*b[1])/d,(a[1]*b[0]-a[0]*b[1])/d];
+}
+
+function cdivr(a,r) {    // divide in place by r
+  a[0]/=r;
+  a[1]/=r;
+  return a;
+}
+
+function cdivi(a,r) {    // divide in place by ir
+  var t = a[0]/r;
+  a[0] = a[1]/r;
+  a[1] = -t;
+  return a;
+}
+
+function cdivc(a,b) {    // divide in place by complex b
+  var d = b[0]*b[0]+b[1]*b[1];
+  var r = (a[0]*b[0]+a[1]*b[1])/d;
+  a[1] = (a[1]*b[0]-a[0]*b[1])/d;
+  a[0] = r;
+  return a;
+}
+
+function cabs(a) {
+  return Math.sqrt(a[0]*a[0]+a[1]*a[1]);
+}
+
+function cabs2(a) {
+  return a[0]*a[0]+a[1]*a[1];
+}
+
+function carg(a) {
+  return a[0] || a[1] ? Math.atan2(a[1],a[0]) : 0;
+}
+
+function csqrt(a) {
+  var d = Math.sqrt(cabs(a));
+  var t = carg(a)/2;
+  return [d*Math.cos(t),d*Math.sin(t)];
+}
+
+function csquare(a) {
+  return [a[0]*a[0]-a[1]*a[1],2*a[0]*a[1]];
+}
+
+var vh = Math.sqrt(.5);
+var cvi = complex(vh,vh);
+var cvmi = complex(vh,-vh);
+var chphi = complex(.5,.5);
+var chmhi = complex(.5,-.5);
+
+function initdisplay() {
+  allbtn = document.getElementById("all");
+  allbtn.style='vertical-align:'+F+'px;';
+  allbtn.parentElement.style='text-align:center;margin:0 auto;';
+  allbtn.parentElement.parentElement.style='width:'+W+'px;';
+  var q = document.getElementById("qubits");
+  q.height = R+F;
+  q.width = W;
+  var c = document.getElementById("combos");
+  c.height = dY;
+  c.width = W;
+  qx = q.offsetLeft;
+  qy = q.offsetTop;
+  qtx = q.getContext('2d');
+  cx = c.offsetLeft;
+  cy = c.offsetTop;
+  ctx = c.getContext('2d');
+  ctx.lineWidth=1;
+  butdiv = document.getElementById("buttons");
+  dosdiv = document.getElementById("dos");
+  var op;
+  for (op in opdict) {
+    butdiv.innerHTML += "<button type='button' disabled onclick='doop(this)'>"+op+"</button> ";
+  }
+  init(1);
+}
+
+function init(q) {    // q is number of qubits
+  state=[];
+  oplog=[];
+  lindex=0;
+  marks=[];
+  var i;
+  n = q;
+  N = 1<<q;
+  var ivN = 1/(q&1 ? Math.sqrt(N) : 1<<(q>>1));
+  for (i=0; i<N; i++) {    // initialize all qbits to hadamard(0)
+    state[i] = complex(ivN);
+  }
+  showstate();
+}
+
+function incq() {
+  var i;
+  for (i=N;i--;) state.push(complex());
+  N <<= 1;
+  hadamard(n++);
+  ctx.canvas.height = Math.ceil(N/X)*dY;
+}
+
+function decq() {    // undo incq
+  if (read(--n)) xgate(n);
+  state = state.slice(0,(N>>=1));
+  ctx.canvas.height = Math.ceil(N/X)*dY;
+}
+
+function prob(b) {    // probability of qubit b being 1
+  var i;
+  var o = 0;
+  for (i=N;i--;) if ((i>>b)&1) o += cabs2(state[i]);
+  return o;
+}
+
+var oplog;    // each entry is op# and args
+var lindex;   // index of current op
+
+var opdict = {    // name->(op function, inverse op function, #args [each a qubit])
+  '+qubit':[incq,decq,0],
+  'Read':[read,unread,1],
+  'Clear':[clear,unread,1],
+  'Hadamard':[hadamard,hadamard,1],
+  'Not':[xgate,xgate,1],
+  'Y':[ygate,etagy,1],
+  'Pi/2':[zgate,zgate,1],
+  'Pi/4':[pi4,tpi4,1],
+  'Pi/8':[pi8,spi8,1],
+  'Not/2':[sqrt_not,ton_trqs,1],
+  'Negate0':[negate0,negate0,1],
+  'CNot':[cnot,cnot,2],
+  'CCNot':[ccnot,ccnot,3],
+  'Swap':[swap,swap,2],
+  'CSwap':[cswap,cswap,3],
+  'NotIf0':[notif0,notif0,1],
+  'Negate':[negate,negate,-1]    // arg is specific bit combo
+}
+
+function mark(o) {    // return true if already marked, else mark and return false
+  clearbuttons(o);
+  var i;
+  for (i=marks.length; i--; ) {
+    if (marks[i] > lindex) continue;
+    if (marks[i] == lindex) return true;
+    break;
+  }
+  marks.splice(i+1,0,lindex);
+  dobuttons();
+  return false;
+}
+
+// NOTE: to undo read, we have to store copy of original state
+
+function undo(o) {
+  clearbuttons(o);
+  if (lindex) {    // must be something to undo
+    var op = oplog[--lindex];
+    opdict[op[0]][1].apply(0,op[1]);
+    showstate();
+  }
+}
+
+function redo(o) {
+  clearbuttons(o);
+  if (lindex < oplog.length) {    // must be something to redo
+    var op = oplog[lindex++];
+    if (op[0] == 'Read' || op[0] == 'Clear') op[1][1] = copystate();
+    opdict[op[0]][0].apply(0,op[1]);
+    showstate();
+  }
+}
+
+function undoset(o) {
+  clearbuttons(o);
+  var op,op0,a;
+  var m=N;
+  while (lindex) {
+    op = oplog[--lindex];
+    if ((op0 = op0 || op[0]) != op[0] ||
+	(a = op[1][opdict[op0][2]-1]) >= m) {
+      ++lindex;
+      break;
+    }
+    m = a;
+    opdict[op0][1].apply(0,op[1]);
+  }
+  showstate();
+}
+
+function redoset(o) {
+  clearbuttons(o)
+  var op,op0,a;
+  var m=-1;
+  while (lindex < oplog.length) {
+    var op = oplog[lindex++];
+    if ((op0 = op0 || op[0]) != op[0] ||
+	(a = op[1][opdict[op0][2]-1]) <= m) {
+      --lindex;
+      break;
+    }
+    m = a;
+    if (op0 == 'Read' || op0 == 'Clear') op[1][1] = copystate();
+    opdict[op0][0].apply(0,op[1]);
+  }
+  showstate();
+}
+
+function marked(x) {
+  var i;
+  for (i=marks.length;i--;) if (marks[i] <= x) return marks[i]==x;
+}
+
+function prevmark() {
+  var i;
+  for (i=marks.length;i--;) if (marks[i] < lindex) return marks[i];
+  return lindex+1;
+}
+
+function nextmark() {
+  var i;
+  for (i=0; i<marks.length; i++) if (marks[i] > lindex) return marks[i];
+  return -1;
+}
+
+function undo2mark(o) {
+  clearbuttons(o);
+  var p = prevmark();
+  while (lindex > p) {
+    var op = oplog[--lindex];
+    opdict[op[0]][1].apply(0,op[1]);
+  }
+  showstate();
+}
+
+function redo2mark(o) {
+  clearbuttons(o);
+  var x = nextmark();
+  while (lindex < x) {
+    var op = oplog[lindex++];
+    if (op[0] == 'Read' || op[0] == 'Clear') op[1][1] = copystate();
+    opdict[op[0]][0].apply(0,op[1]);
+  }
+  showstate();
+}
+
+function repfromark(o) {
+  clearbuttons(o);
+  var p = prevmark();
+  var x = lindex;
+  var i;
+  var q = mark();
+  for (i=p; i<x; i++) dodo.apply(0,oplog[i])
+  if (q) {
+    mark();
+    pw && save2popup();
+  }
+}
+
+function undoall(o) {
+  clearbuttons(o);
+  while (lindex) {
+    var op = oplog[--lindex];
+    opdict[op[0]][1].apply(0,op[1]);
+  }
+  showstate();
+}
+
+function redoall(o) {
+  clearbuttons(o);
+  while (lindex < oplog.length) {
+    var op = oplog[lindex++];
+    if (op[0] == 'Read' || op[0] == 'Clear') op[1][1] = copystate();
+    opdict[op[0]][0].apply(0,op[1]);
+  }
+  showstate();
+}
+
+function clearbuttons(o) {
+  if (o) o.blur();
+  Array.prototype.forEach.call(butdiv.children,
+			       function(o,i){o.style.backgroundColor='';});
+  pop = null;
+  showstate();
+}
+
+function truncatelog() {
+  var i;
+  for (var i=0; i<marks.length; i++) if (marks[i] > lindex) break;
+  marks.length = i;
+  oplog.length = lindex;
+}
+
+function dodo(fun,args) {    // args are funcname,[arg0,arg1,...]
+  var l = args.length;
+  if (l > 2) {
+    var a = args.slice();
+    a.sort();
+  } else {
+    a = args;
+  }
+  for (var i=l; --i>0;) if (a[i-1]==a[i]) return;
+  clearbuttons();
+  truncatelog();
+  if (fun == 'Read' || fun == 'Clear') args.push(copystate());
+  oplog.push([fun,args]);
+  redo();
+}
+
+var pop;    // pending operation
+var args;   // args
+
+function doop(o) {    // get args and execute
+  clearbuttons(o);
+  o.style.backgroundColor = 'yellow';
+  pop = o.textContent;
+  args = [];
+  var a = opdict[pop][2];
+  if (!a) dodo(pop,args);
+  else if (a*a==1) allbtn.disabled=false;
+}
+
+function append(a,x) {
+  a = a.slice();
+  a.push(x);
+  return a;
+}
+
+function doall() {
+  var i,k;
+  if (pop && args.length==(k=Math.abs(opdict[pop][2])-1)) {
+    var op = pop;
+    for (i=0;i<(opdict[op][2]>0?n:N);i++) dodo(op,append(args,i));
+  }
+}
+
+function qclick(e) {    // click on qubit canvas
+  var a;
+  if (pop && (a = opdict[pop][2]) > 0) {
+    var q = Math.floor((e.pageX-qx)/2/R);
+    if (0<=q && q<n) {
+      for (var i in args) if (args[i]==q) return;
+      args.push(q);
+      if (a > args.length) {
+	qtx.beginPath();
+	qtx.lineWidth=5;
+	qtx.strokeStyle = 'rgba(255,255,0,.75)';
+	qtx.moveTo(R+q*2*R,R);
+	qtx.lineTo(R+q*2*R,0);
+	qtx.stroke();
+	if (a-1 == args.length) allbtn.disabled=false;
+      } else dodo(pop,args);
+    }
+  }
+}
+
+function cclick(e) {    // click on combo canvas
+  var a;
+  if (pop && (a = -opdict[pop][2]) > 0) {
+    var x = e.pageX - cx;
+    var y = e.pageY - cy;
+    var c = Math.floor(y/dY)*X + Math.min(X-1,Math.floor(x/2/R));
+    if (0<=c && c<N) {
+      for (var i in args) if (args[i]==c) return;
+      args.push(c);
+      if (a > args.length) {
+	var x = c%X;
+	var y = (c-x)/X;
+	ctx.beginPath();
+	ctx.arc(R+x*2*R,R+y*dY,R,0,Math.PI*2,true);
+	ctx.strokeStyle = 'rgba(255,255,0,.5)';
+	ctx.lineWidth = 5;
+	ctx.stroke();
+	if (a-1 == args.length) allbtn.disabled=false;
+      } else dodo(pop,args);
+    }
+  }
+}
+
+function copystate() {
+  var i;
+  c = [];
+  for (i=0;i<N;i++) c.push(state[i].slice());
+  return c;
+}
+
+// qubit operations:
+
+function read(b) {    // read qubit b
+  var i;
+  var o = prob(b);
+  if (0 < o && o < 1) {
+    var v = 1*(Math.random()<o);
+    var r = Math.sqrt(v ? 1/o : 1/(1-o));
+    for (i=N;i--;) cmulr(state[i],(((i>>b)&1) == v) && r);
+  } else {
+    return 1*!!o;
+  }
+  return v;
+}
+
+function unread(b,savedstate) {
+  state = savedstate;
+}
+
+function clear(b) {    // clear qubit b
+  read(b) && xgate(b);
+}
+
+function hadamard(b) {    // apply hadamard gate to bit b
+  var i;
+  bb = 1<<b;
+  for (i=N;i--;) if (i&bb) {
+    var s1 = cmulr(state[i],vh);
+    var s0 = cmulr(state[i-bb],vh);
+    var t = cadd(s0,s1);
+    state[i] = csub(s0,s1);
+    state[i-bb] = t;
+  }
+}
+
+function xgate(b) {    // apply not gate to bit b: |0> -> |1>, |1> -> |0>
+  var i;
+  bb = 1<<b;
+  for (i=N;i--;)
+    if (i&bb) {
+      var s = state[i];
+      state[i] = state[i-bb];
+      state[i-bb] = s;
+    }      
+}
+
+function ygate(b) {    // apply y gate to bit b: |0> -> i|1>, |1> -> i|0>
+  var i;
+  bb = 1<<b;
+  for (i=N;i--;)
+    if (i&bb) {
+      var s = state[i];
+      state[i] = state[i-bb];
+      state[i-bb] = s;
+      cmuli(state[i],1);
+      cmuli(state[i-bb],1);
+    }
+}
+
+function etagy(b) {    // undo y gate
+  var i;
+  bb = 1<<b;
+  for (i=N;i--;)
+    if (i&bb) {
+      var s = state[i];
+      state[i] = state[i-bb];
+      state[i-bb] = s;
+      cmuli(state[i],-1);
+      cmuli(state[i-bb],-1);
+    }
+}
+
+function zgate(b) {    // apply pi/2 gate to bit b: |1> -> -|1>
+  var i;
+  bb = 1<<b;
+  for (i=N;i--;) if (i&bb) cmulr(state[i],-1);
+}
+
+function sqrt_not(b) {    // apply square root of not gate to bit b :
+                          // |0> -> .5(1+i)|0>+.5(1-i)|1>, |1> -> .5(1-i)|0>+.5(1+i)|1>
+  var i;
+  bb = 1<<b;
+  for (i=N;i--;)
+    if (i&bb) {
+      var s1 = state[i];
+      var s0 = state[i-bb];
+      state[i] = cadd(cmul(s1,chphi),cmul(s0,chmhi));
+      state[i-bb] = cadd(cmul(s0,chphi),cmul(s1,chmhi));
+    }
+}
+
+function ton_trqs(b) {    // undo sqrt_not gate
+  var i;
+  bb = 1<<b;
+  for (i=N;i--;)
+    if (i&bb) {
+      var s1 = state[i];
+      var s0 = state[i-bb];
+      state[i] = cadd(cmul(s1,chmhi),cmul(s0,chphi));
+      state[i-bb] = cadd(cmul(s0,chmhi),cmul(s1,chphi));
+    }
+}
+
+function negate0(b) {    // |0> -> -|0>
+  var i;
+  bb = 1<<b;
+  for (i=N;i--;) if (!(i&bb)) cmulr(state[i],-1);
+}
+
+function pi4(b) {    // |1> -> i|1>
+  var i;
+  bb = 1<<b;
+  for (i=N;i--;) if (i&bb) cmuli(state[i],1);
+}
+
+function tpi4(b) {    // |1> -> -i|1>
+  var i;
+  bb = 1<<b;
+  for (i=N;i--;) if (i&bb) cmuli(state[i],-1);
+}
+
+function pi8(b) {    // |1> -> v.5(1+i)|1>
+  var i;
+  bb = 1<<b;
+  for (i=N;i--;) if (i&bb) cmulc(state[i],cvi);
+}
+
+function spi8(b) {    // |1> -> v.5(1-i)|1>
+  var i;
+  bb = 1<<b;
+  for (i=N;i--;) if (i&bb) cmulc(state[i],cvmi);
+}
+
+function cnot(b,c) {    // controlled not gate: c ^= b
+  var i,t;
+  bb = 1<<b;
+  cc = 1<<c;
+  for (i=N;i--;)
+    if (i&bb && i&cc) {
+      t = state[i];
+      state[i] = state[i-cc];
+      state[i-cc] = t;
+    }
+}
+
+function ccnot(b,c,d) {    // Toffoli gate: d ^= b&c
+  var i,t;
+  bb = 1<<b;
+  cc = 1<<c;
+  dd = 1<<d;
+  for (i=N;i--;)
+    if (i&bb && i&cc && i&dd) {
+      t = state[i];
+      state[i] = state[i-dd];
+      state[i-dd] = t;
+    }
+}
+
+function swap(b,c) {    // exchange b and c
+  var i,t;
+  bb = 1<<b;
+  cc = 1<<c;
+  for (i=N;i--;)
+    if (!(i&bb) && (i&cc)) {
+      t = state[i];
+      state[i] = state[i^bb^cc];
+      state[i^bb^cc] = t;
+    }
+}
+
+function cswap(b,c,d) {    // Fredkin gate: exchange c and d if b
+  var i,t;
+  bb = 1<<b;
+  cc = 1<<c;
+  dd = 1<<d;
+  for (i=N;i--;)
+    if (i&bb && !(i&cc) && (i&dd)) {
+      t = state[i];
+      state[i] = state[i^cc^dd];
+      state[i^cc^dd] = t;
+    }
+}
+
+function notif0(b) {    // apply not to b if all other bits zero
+  bb = 1<<b;
+  var t = state[0];
+  state[0] = state[bb];
+  state[bb] = t;
+}
+
+function negate(c) {    // negate amplitude of bit combo c
+  cmulr(state[c],-1);
+}
+</script>
+</head>
+<body onload="initdisplay()">
+  <label for="title">Title</label>
+  <input id="title" type="text"/>&nbsp;&nbsp;&nbsp;
+  <label for="loadFile">Load from file:</label>
+  <input type="file" accept=".qco" id="loadFile" onChange="loadFiles(this)"/>&nbsp;&nbsp;
+  <button type="button" id="save2window" onClick="save2popup(this)">SHOW AS TEXT</button>
+  <hr>
+  <div id="dos" style="margin-bottom:3px">
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    <button type='button' onclick='mark(this)'>Mark</button>&nbsp;
+    <button type='button' onclick='repfromark(this)'>Repeat from Mark</button>&nbsp;
+    <button type='button' onclick='undo2mark(this)'>Undo to Mark</button>&nbsp;
+    <button type='button' onclick='redo2mark(this)'>Redo to Mark</button>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+
+    <button type='button' onclick='undo(this)'>Undo</button>&nbsp;
+    <button type='button' onclick='redo(this)'>Redo</button>&nbsp;&nbsp;&nbsp;
+    <button type='button' onclick='undoset(this)'>Undo Set</button>&nbsp;
+    <button type='button' onclick='redoset(this)'>Redo Set</button>&nbsp;&nbsp;&nbsp;
+    <button type='button' onclick='undoall(this)'>Undo All</button>&nbsp;
+    <button type='button' onclick='redoall(this)'>Redo All</button>
+  </div>
+  <div id="buttons"></div>
+  <canvas id="qubits" width="1024" height="32" onclick="qclick(event)"></canvas>  <br>
+  <div><div><button id="all" button type='button' disabled onclick='doall()'>All</button></div></div>
+  <canvas id="combos" width="1024" height="512" onclick="cclick(event)"></canvas>
+</body>
+</html>
