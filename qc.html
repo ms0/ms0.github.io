@@ -136,7 +136,13 @@ function dobuttons() {
 function save2popup(o) {
   o && o.blur();
   var title = document.getElementById('title').value;
-  pw = pw || window.open('',title,'height=512,width=64,resizable=1,scrollbars=1');
+  if (!(pw && pw.document)) {
+    if (!o) {
+      pw = undefined;
+      return;
+    }
+    pw = window.open('',title,'height=512,width=64,resizable=1,scrollbars=1');
+  }
   var d = pw.document;
   var s = d.body.scrollTop;
   d.body.innerHTML='';
@@ -417,8 +423,9 @@ var opdict = {    // name->(op function, inverse op function, #args [each a qubi
   'Not/2':[sqrt_not,ton_trqs,1],
   'Negate0':[negate0,negate0,1],
   'CNot':[cnot,cnot,2],
-  'CCNot':[ccnot,ccnot,3],
   'Swap':[swap,swap,2],
+  'Swap/2':[sqrt_swap,paws_trqs,2],
+  'CCNot':[ccnot,ccnot,3],
   'CSwap':[cswap,cswap,3],
   'NotIf0':[notif0,notif0,1],
   'Negate':[negate,negate,-1]    // arg is specific bit combo
@@ -838,6 +845,32 @@ function swap(b,c) {    // exchange b and c
       t = state[i];
       state[i] = state[i^bb^cc];
       state[i^bb^cc] = t;
+    }
+}
+
+function sqrt_swap(b,c) {    // sqrt of swap
+  var i;
+  bb = 1<<b;
+  cc = 1<<c;
+  for (i=N;i--;)
+    if (!(i&bb) && (i&cc)) {
+      var s = state[i];
+      var t = state[i^bb^cc];
+      state[i] = cadd(cmul(s,chphi),cmul(t,chmhi));
+      state[i^bb^cc] = cadd(cmul(t,chphi),cmul(s,chmhi));
+    }
+}
+
+function paws_trqs(b,c) {    // undo sqrt_swap
+  var i;
+  bb = 1<<b;
+  cc = 1<<c;
+  for (i=N;i--;)
+    if (!(i&bb) && (i&cc)) {
+      var s = state[i];
+      var t = state[i^bb^cc];
+      state[i] = cadd(cmul(s,chmhi),cmul(t,chphi));
+      state[i^bb^cc] = cadd(cmul(t,chmhi),cmul(s,chphi));
     }
 }
 
