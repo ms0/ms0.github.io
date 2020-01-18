@@ -135,14 +135,14 @@ function dobuttons() {
 
 function save2popup(o) {
   o && o.blur();
-  var title = document.getElementById('title').value;
-  if (!(pw && pw.document)) {
-    if (!o) {
+  if (!pw || pw.closed)
+    if (o) {
+      pw = window.open('',title,'height=512,width=64,resizable=1,scrollbars=1');
+    } else {
       pw = undefined;
       return;
-    }
-    pw = window.open('',title,'height=512,width=64,resizable=1,scrollbars=1');
-  }
+    }    
+  var title = document.getElementById('title').value;
   var d = pw.document;
   var s = d.body.scrollTop;
   d.body.innerHTML='';
@@ -173,11 +173,10 @@ function save2popup(o) {
   var o = d.getElementsByTagName('hr')[0];
   try {o.scrollIntoViewIfNeeded({behavior:'smooth',block:'center'});}
   catch (e) {
-    var p = o.parentElement;
     var y = o.offsetTop;
-    var h = p.clientHeight;
+    var h = pw.innerHeight;
     var y0 = s;
-    p.scrollTo(0,(y <= y0 || y >= y0+h) ? y-h/2 : s);
+    pw.scrollTo(0,(y <= y0 || y >= y0+h) ? y-h/2 : s);
   };
 }
 
