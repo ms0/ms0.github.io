@@ -145,7 +145,6 @@ function save2popup(o) {
   var title = document.getElementById('title').value;
   var d = pw.document;
   var s = d.body.scrollTop;
-  d.body.innerHTML='';
   var x = '<html><head><title>'+title+'</title><style>p{font-family:"Lucida Console";font-size:9pt;text-align:left;line-height:9pt;margin:0;}hr{padding:0px;margin:0px;}</style></head><body>';
   var i;
   var j=0;    // index into marks
@@ -168,16 +167,18 @@ function save2popup(o) {
   x += '</body></html>';
   d.write(x);
   d.close();
-  pw.focus();
-  var e;
-  var o = d.getElementsByTagName('hr')[0];
-  try {o.scrollIntoViewIfNeeded({behavior:'smooth',block:'center'});}
-  catch (e) {
-    var y = o.offsetTop;
-    var h = pw.innerHeight;
-    var y0 = s;
-    pw.scrollTo(0,(y <= y0 || y >= y0+h) ? y-h/2 : s);
-  };
+  pw.scrollTo(0,s);
+  setTimeout(function() {
+    pw.focus();
+    var e;
+    var o = d.getElementsByTagName('hr')[0];
+    try {o.scrollIntoViewIfNeeded({behavior:'smooth',block:'center'});}
+    catch (e) {
+      var y = o.offsetTop;
+      var h = pw.innerHeight;
+      (y <= s || y >= s+h) && pw.scrollTo(0, y-h/2);
+    };
+  },1);
 }
 
 function loadFiles(o) {
@@ -440,6 +441,7 @@ function mark(o) {    // return true if already marked, else mark and return fal
   }
   marks.splice(i+1,0,lindex);
   dobuttons();
+  o && showstate();
   return false;
 }
 
@@ -574,7 +576,6 @@ function clearbuttons(o) {
   Array.prototype.forEach.call(butdiv.children,
 			       function(o,i){o.style.backgroundColor='';});
   pop = null;
-  showstate();
 }
 
 function truncatelog() {
