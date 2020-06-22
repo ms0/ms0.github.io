@@ -34,10 +34,18 @@ function keydown(e) {
   if (e.repeat) return;
   var k;
   var key = e.keyCode;
-  if ('1'.charCodeAt() <= key && key <= '9'.charCodeAt()) k = key-'1'.charCodeAt();
-  else return;
-  if (k >= scale.length) return;
-  tone = Q0*2**(scale[k]/T8)*(1+e.shiftKey) ;
+  if ('1'.charCodeAt() <= key && key <= '9'.charCodeAt()) {
+    k = key-'1'.charCodeAt();
+    if (k >= scale.length) return;
+    k = scale[k];
+  } else {
+    try {
+      k = Math.round(T8*Math.log2(keymap[String.fromCharCode(key)]));
+    } catch {
+      return;
+    }
+  }
+  tone = Q0*2**(k/T8)*(1+e.shiftKey);
   stopFreq(tone);
   playSound();
 }
@@ -46,10 +54,34 @@ function keyup(e) {
   if (document.activeElement.tagName != 'BODY') return;
   var k;
   var key = e.keyCode;
-  if ('1'.charCodeAt() <= key && key <= '9'.charCodeAt()) k = key-'1'.charCodeAt();
-  else return;
-  if (k >= scale.length) return;
-  stopFreq(Q0*2**(scale[k]/T8)*(1+e.shiftKey));
+  if ('1'.charCodeAt() <= key && key <= '9'.charCodeAt()) {
+    k = key-'1'.charCodeAt();
+    if (k >= scale.length) return;
+    k = scale[k];
+  } else {
+    try {
+      k = Math.round(T8*Math.log2(keymap[String.fromCharCode(key)]));
+    } catch {
+      return;
+    }
+  }
+  stopFreq(Q0*2**(k/T8)*(1+e.shiftKey));
+}
+
+var keymap = {
+  'A':1,
+  'W':16/15,
+  'S':9/8,
+  'E':6/5,
+  'D':5/4,
+  'F':4/3,
+  'T':7/5,
+  'G':3/2,
+  'Y':8/5,
+  'H':5/3,
+  'U':16/9,
+  'J':15/8,
+  'K':2
 }
 
 document.onkeydown = keydown;
