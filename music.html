@@ -1,0 +1,359 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+
+<script>
+// adapted from https://stackoverflow.com/questions/34708980/generate-sine-wave-and-play-it-in-the-browser#
+
+/* Chromatic Scale with T8 notes
+ 8-note scales [semitone steps shown, but computed by frequency ratios]
+   Major                2212221
+   Natural Minor        2122122  (aka descending melodic minor)
+   Harmonic Minor       2122131
+   Melodic Minor        2122221  (aka ascending melodic minor)
+   Hungarian Minor      2131131
+  keys in selected scale are marked
+ Alphanumeric Keyboard interface: 
+   keys 1 thru 8 play the notes of the selected 8-note scale
+ Chromatic Keyboard interface: 
+   Mouse down plays note where mouse is
+   Mouse up stops playing note 
+*/
+
+var T8 = 12;    // number of tones in octave
+var kw = 12;    // key width
+var kh = 20;    // key height
+
+window.AudioContext = window.AudioContext || window.webkitAudioContext;
+
+var kcanvas;
+var kcontext;
+
+function keydown(e) {
+  if (document.activeElement.tagName != 'BODY') return;
+  if (e.repeat) return;
+  var k;
+  var key = e.keyCode;
+  if ('1'.charCodeAt() <= key && key <= '9'.charCodeAt()) k = key-'1'.charCodeAt();
+  else return;
+  if (k >= scale.length) return;
+  tone = Q0*2**(scale[k]/T8)*(1+e.shiftKey) ;
+  stopFreq(tone);
+  playSound();
+}
+
+function keyup(e) {
+  if (document.activeElement.tagName != 'BODY') return;
+  var k;
+  var key = e.keyCode;
+  if ('1'.charCodeAt() <= key && key <= '9'.charCodeAt()) k = key-'1'.charCodeAt();
+  else return;
+  if (k >= scale.length) return;
+  stopFreq(Q0*2**(scale[k]/T8)*(1+e.shiftKey));
+}
+
+document.onkeydown = keydown;
+document.onkeyup = keyup;
+
+function initkeys(te) {
+  var t = parseInt(te.value);
+  if (t != t || t < 2 || t > 200) {
+    te.style.backgroundColor = 'pink';
+  } else {
+    te.style.backgroundColor = 'white';
+    T8 = t;
+    kinit();
+    te.blur();
+  }
+}
+
+function minit() {
+  initkeys(document.getElementById('t'));
+  setA4(document.getElementById('a'));
+  setF0(document.getElementById('f'));
+  setVolume(document.getElementById('vol'));
+}
+
+function kinit() {
+  kcanvas = document.getElementById("keys");
+  kcanvas.width = (T8+1)*kw;
+  kcanvas.height = kh+1;
+  kcontext = kcanvas.getContext('2d');
+  kcontext.strokeStyle='black';
+  kcontext.lineWidth='1';
+  kcontext.lineCap='square';
+  kcontext.lineJoin='miter';
+
+  kcontext.beginPath();
+  kcontext.moveTo(0,0);
+  kcontext.lineTo((T8+1)*kw,0);
+  kcontext.moveTo(0,kh);
+  kcontext.lineTo((T8+1)*kw,kh);
+  for (x=0; x<=T8+1; x++) {
+    kcontext.moveTo(kw*x,0);
+    kcontext.lineTo(kw*x,kh);
+  }
+  kcontext.stroke();
+  setScale(document.getElementById('scale'));
+}  
+
+function markKey(k,c) {
+  if (k < 0) return;
+  kcontext.beginPath();
+  kcontext.moveTo(kw*k+2,3);
+  kcontext.lineTo(kw*(k+1)-2,3);
+  kcontext.strokeStyle=c;
+  kcontext.lineWidth='2';
+  kcontext.stroke();
+}
+
+var scalenotes = [
+  [1,9/8,5/4,4/3,3/2,5/3,15/8,2],
+  [1,9/8,6/5,4/3,3/2,8/5,16/9,2],
+  [1,9/8,6/5,4/3,3/2,8/5,15/8,2],
+  [1,9/8,6/5,4/3,3/2,5/3,15/8,2],
+  [1,9/8,6/5,7/5,3/2,8/5,15/8,2]
+]
+
+var scale;    // tones in scale
+
+function scaleinit(k) {
+  var s = scalenotes[k];
+  var i;
+  kcontext.beginPath();
+  for (k = T8; k--;) {
+    kcontext.moveTo(kw*k+kw/2,kw/2);
+    kcontext.lineTo(kw*k+kw/2,kh-kw/2);
+  }
+  kcontext.strokeStyle='white';
+  kcontext.lineWidth='2';
+  kcontext.stroke();    
+  kcontext.beginPath();
+  var ok = -1;
+  scale = [];
+  for (i in s) {
+    k = Math.round(T8*Math.log2(s[i]));
+    if (k <= ok) continue;
+    kcontext.moveTo(kw*k+kw/2,kw/2);
+    kcontext.lineTo(kw*k+kw/2,kh-kw/2);
+    scale.push(ok=k);
+  }
+  kcontext.lineWidth='1';
+  kcontext.strokeStyle = 'black';
+  kcontext.stroke();
+}
+
+function setScale(se) {
+  scaleinit(se.value*1);
+  se.blur();
+}
+
+function mouseUp(e) {
+  if (!e) e = window.event;
+  if (!e.shiftKey) mouseLeave(e)
+  seqno++;
+}
+
+function mouseDown(e) {
+  if (!e) e = window.event;
+  var t = Math.floor((e.offsetX)/kw)/T8;
+  if (t < 0 || t > 1) return;
+  if (e.shiftkey) return mouseMove(e);
+  if (!stopFreq(Q0*2**t)) return mouseMove(e);
+}
+
+function mouseMove(e) {
+  if (!e) e = window.event;
+  var t = Math.floor((e.offsetX)/kw)/T8;
+  if (t < 0 || t > 1) {
+    mouseLeave(e);
+  } else {
+    if (!e.buttons) return;
+    tone = Q0*2**t;
+    try {
+      t = sources[seqno][0].frequency.value;
+      sources[seqno][0].frequency.value = tone;
+      markKey(f2k(t),'white');
+      markKey(f2k(tone),'green');
+      document.getElementById('tablehead').nextSibling.firstChild.innerText=tone.toFixed(3);
+    } catch(err) {
+      playSound();
+    }
+  }
+}
+
+function mouseLeave(e) {
+  try {
+    stopSound(seqno);
+    --seqno;
+    tone = null;
+  } catch(err) {}
+}
+
+var acontext = new AudioContext();
+var tone = 440;
+var volume = .2;
+var seqno=0;
+var sources={};
+var A4 = 440;
+var Q0 = 440;
+
+function setF0(fe) {
+  Q0 = enterFrequency(fe) || A4;
+}
+
+function setA4(ae) {
+  var t = parseFloat(ae.value);
+  if (t < 220 || t > 880 || t != t) {
+    ae.style.backgroundColor = 'pink';
+  } else {
+    ae.style.backgroundColor = 'white';
+    A4 = t;
+    setFrequency(document.getElementById('freq'));
+    setF0(document.getElementById('f'));
+  }
+}
+
+var fref = /^(\d+(\/\d+)?\s*)?[a-g][#b]*\d*$/i;
+var fren = /^\d*\.?\d*$/
+var nd = [0,2,-9,-7,-5,-4,-2];
+
+function f2k(f) {
+  k = Math.round(Math.log2(f/Q0)*T8);
+  return 0 <= k && k <= T8 && Math.abs(f-2**(k/T8)*Q0)<.001 ? k : -1;
+}
+
+function setFrequency(te) {
+  tone = enterFrequency(te);
+}
+
+function enterFrequency(te) {
+  var t = te.value.trim();
+  var s;
+  var f;
+  var d;
+  var e;
+  if (!t.search(fref)) {
+    s = t.search('/');
+    f = parseInt(t)/(s<0 ? 1 :parseInt(t.slice(s+1)));
+    if (f != f) f = 1;
+    s = t.search(/[a-g]/i);
+    d = nd[t[s].toLowerCase().charCodeAt() - 'a'.charCodeAt()];
+    t = t.slice(s);
+    while (t = t.slice(1)) {
+      if (t[0] == 'b') --d;
+      else if (t[0] == '#') ++d;
+      else break;
+    }
+    e = parseInt(t);
+    if (e==e) d += 12*(e-4);
+    t = A4*2**(d/12)*f;
+  } else if (t && !t.search(fren)) {
+    t = parseFloat(t);
+  } else {
+    t = 0;
+  }
+  if (t < 10 || t > acontext.sampleRate/2 || t != t) {
+    te.style.backgroundColor = 'pink';
+    t = null;
+  } else {
+    te.style.backgroundColor='white';
+    te.blur();
+  }
+  return t;
+}
+
+function setVolume(ve) {
+  volume = parseFloat(ve.value);
+  if (volume <= 0 || volume > 1 || volume != volume) {
+    ve.style.backgroundColor = 'pink';
+    volume = null;
+  } else {
+    ve.style.backgroundColor = 'white';   
+  }  
+}
+
+function playFreq(pe) {
+  setFrequency(document.getElementById('freq'));
+  playSound();
+  pe.blur();
+}
+
+function playSound() {
+  if (tone && volume) {
+    ++seqno;
+    var source = new OscillatorNode(acontext,{frequency:tone});
+    var gain = acontext.createGain();
+    gain.connect(acontext.destination);
+    gain.gain.value = volume;
+    source.connect(gain);
+    var t = document.getElementById('tablehead');
+    t.insertAdjacentHTML('afterend','<tr id='+seqno+'><td>'+tone.toFixed(3)+'</td><td>'+volume.toFixed(3)+'</td><td><button type="button" onClick="stopSound('+seqno+')">Stop</button></td>')
+    sources[seqno] = [source,gain];
+    source.start();
+    markKey(f2k(tone),'green');
+  }
+}
+
+function stopFreq(f) {
+  for (n in sources) {
+    if (Math.abs(f-sources[n][0].frequency.value)<.001) {
+      stopSound(n);
+      return true;
+    }
+  }
+  return false;
+}
+
+function stopSound(n) {
+  sources[n][0].stop();
+  markKey(f2k(sources[n][0].frequency.value),'white');
+  sources[n][0].disconnect();
+  sources[n][1].disconnect();
+  delete sources[n];
+  var o = document.getElementById(n);
+  o.parentNode.removeChild(o);
+}
+
+</script>
+<style>
+p {text-align:center;}
+table {margin-left:auto;margin-right:auto;}
+th {text-align:center;}
+td {text-align:center;}
+canvas {margin:auto;display:block;}
+</style>
+</head>
+<body onload="minit()">
+
+<h1 style="text-align:center">Play Tones</h1>
+<p>
+<label for='a'>Frequency of A4</label> <input id='a' title="Enter frequency of A4" placeholder="A4 frequency" onChange="setA4(this)" value="440"></p>
+<p>
+<label for='t'>Tones per Octave</label> <input id='t' title="Enter number of tones per octave" placeholder="Tones per Octave" onChange="initkeys(this)" value="12">&nbsp&nbsp<label for='f'>First Tone</label> <input id='f' title="Enter frequency of first tone in octave" onChange="setF0(this)" value="c"></p>
+<p>
+<label for='scaale'>Scale</label> <select id='scale' onChange='setScale(this)'>
+<option value='0' selected>Major</option>
+<option value='1'>Natural Minor</option>
+<option value='2'>Harmonic Minor</option>
+<option value='3'>Melodic Minor</option>
+<option value='4'>Hungarian Minor</option>
+</select>
+</p>
+<canvas id="keys" width="1" height="1"
+   onMouseEnter="mouseMove()"
+   onMouseLeave="mouseLeave()"
+   onMouseMove="mouseMove()"
+   onMouseUp="mouseUp()"   
+   onMouseDown="mouseDown()"
+></canvas>
+<br>
+<table id='table'>
+<tr>
+  <td><input id='freq' title="Enter frequency in Hz, or note symbol (optional ratio x/y, A-G, optional # or b, optional octave number)" placeholder="frequency" onChange="setFrequency(this)" value="440"></td>
+  <td><input id='vol' title="Enter volume between 0 and 1" placeholder="volume" onChange="setVolume(this)" value=".2"></td>
+  <td><button id='ok' type='button' onClick="playFreq(this)">Play</button></td>
+</tr>
+<tr id='tablehead'><th>Frequency</th><th>Volume</th></tr>
+</table>
+</html>
