@@ -22,7 +22,7 @@
 
 var T8 = 12;    // number of tones in octave
 var kw = 12;    // key width
-var kh = 20;    // key height
+var kh = 24;    // key height
 
 window.AudioContext = window.AudioContext || window.webkitAudioContext;
 
@@ -130,9 +130,15 @@ function kinit() {
 
 function markKey(k,c) {
   if (k < 0) return;
+  var j = Math.trunc(k/T8);
+  k %= T8;
   kcontext.beginPath();
-  kcontext.moveTo(kw*k+2,3);
-  kcontext.lineTo(kw*(k+1)-2,3);
+  do {
+    if (j<2) {
+      kcontext.moveTo(kw*k+2,6-3*j);
+      kcontext.lineTo(kw*(k+1)-2,6-3*j);
+    }
+  } while (j-- && (k+=T8)<=T8);
   kcontext.strokeStyle=c;
   kcontext.lineWidth='2';
   kcontext.stroke();
@@ -153,8 +159,8 @@ function scaleinit(k) {
   var i;
   kcontext.beginPath();
   for (k = T8; k--;) {
-    kcontext.moveTo(kw*k+kw/2,kw/2);
-    kcontext.lineTo(kw*k+kw/2,kh-kw/2);
+    kcontext.moveTo(kw*k+kw/2,9);
+    kcontext.lineTo(kw*k+kw/2,kh-5);
   }
   kcontext.strokeStyle='white';
   kcontext.lineWidth='2';
@@ -165,8 +171,8 @@ function scaleinit(k) {
   for (i in s) {
     k = Math.round(T8*Math.log2(s[i]));
     if (k <= ok) continue;
-    kcontext.moveTo(kw*k+kw/2,kw/2);
-    kcontext.lineTo(kw*k+kw/2,kh-kw/2);
+    kcontext.moveTo(kw*k+kw/2,9);
+    kcontext.lineTo(kw*k+kw/2,kh-5);
     scale.push(ok=k);
   }
   kcontext.lineWidth='1';
@@ -181,7 +187,7 @@ function setScale(se) {
 
 function mouseUp(e) {
   if (!e) e = window.event;
-  if (!e.shiftKey) mouseLeave(e)
+  if (!e.ctrlKey) mouseLeave(e)
   seqno++;
 }
 
@@ -189,8 +195,8 @@ function mouseDown(e) {
   if (!e) e = window.event;
   var t = Math.floor((e.offsetX)/kw)/T8;
   if (t < 0 || t > 1) return;
-  if (e.shiftkey) return mouseMove(e);
-  if (!stopFreq(Q0*2**t)) return mouseMove(e);
+  if (e.ctrlKey) return mouseMove(e);
+  if (!stopFreq(Q0*2**(t+e.shiftKey))) return mouseMove(e);
 }
 
 function mouseMove(e) {
@@ -200,7 +206,7 @@ function mouseMove(e) {
     mouseLeave(e);
   } else {
     if (!e.buttons) return;
-    tone = Q0*2**t;
+    tone = Q0*2**(t+e.shiftKey);
     try {
       t = sources[seqno][0].frequency.value;
       sources[seqno][0].frequency.value = tone;
@@ -252,7 +258,7 @@ var nd = [0,2,-9,-7,-5,-4,-2];
 
 function f2k(f) {
   k = Math.round(Math.log2(f/Q0)*T8);
-  return 0 <= k && k <= T8 && Math.abs(f-2**(k/T8)*Q0)<.001 ? k : -1;
+  return 0 <= k && k <= 2*T8 && Math.abs(f-2**(k/T8)*Q0)<.001 ? k : -1;
 }
 
 function setFrequency(te) {
