@@ -339,6 +339,8 @@ function csquare(a) {
 }
 
 var vh = Math.sqrt(.5);
+var cvh = complex(vh,0);
+var cvhi = complex(0,vh);
 var cvi = complex(vh,vh);
 var cvmi = complex(vh,-vh);
 var chphi = complex(.5,.5);
@@ -425,6 +427,8 @@ var opdict = {    // name->(op function, inverse op function, #args [each a qubi
   'CNot':[cnot,cnot,2],
   'Swap':[swap,swap,2],
   'Swap/2':[sqrt_swap,paws_trqs,2],
+  'iSwap':[iswap,pawsi,2],
+  'iSwap/2':[sqrt_iswap,pawsi_trqs,2],
   'CCNot':[ccnot,ccnot,3],
   'CSwap':[cswap,cswap,3],
   'NotIf0':[notif0,notif0,1],
@@ -871,6 +875,56 @@ function paws_trqs(b,c) {    // undo sqrt_swap
       var t = state[i^bb^cc];
       state[i] = cadd(cmul(s,chmhi),cmul(t,chphi));
       state[i^bb^cc] = cadd(cmul(t,chmhi),cmul(s,chphi));
+    }
+}
+
+function iswap(b,c) {    // exchange b and c and shift phase
+  var i,t;
+  bb = 1<<b;
+  cc = 1<<c;
+  for (i=N;i--;)
+    if (!(i&bb) && (i&cc)) {
+      t = state[i];
+      state[i] = cmuli(state[i^bb^cc],1);
+      state[i^bb^cc] = cmuli(t,1);
+    }
+}
+
+function pawsi(b,c) {    // undo iswap
+  var i,t;
+  bb = 1<<b;
+  cc = 1<<c;
+  for (i=N;i--;)
+    if (!(i&bb) && (i&cc)) {
+      t = state[i];
+      state[i] = cmuli(state[i^bb^cc],-1);
+      state[i^bb^cc] = cmuli(t,-1);
+    }
+}
+
+function sqrt_iswap(b,c) {    // sqrt of iswap
+  var i;
+  bb = 1<<b;
+  cc = 1<<c;
+  for (i=N;i--;)
+    if (!(i&bb) && (i&cc)) {
+      var s = state[i];
+      var t = state[i^bb^cc];
+      state[i] = cadd(cmul(s,cvh),cmul(t,cvhi));
+      state[i^bb^cc] = cadd(cmul(t,cvh),cmul(s,cvhi));
+    }
+}
+
+function pawsi_trqs(b,c) {    // undo sqrt_swap
+  var i;
+  bb = 1<<b;
+  cc = 1<<c;
+  for (i=N;i--;)
+    if (!(i&bb) && (i&cc)) {
+      var s = state[i];
+      var t = state[i^bb^cc];
+      state[i] = csub(cmul(s,cvh),cmul(t,cvhi));
+      state[i^bb^cc] = csub(cmul(t,cvh),cmul(s,cvhi));
     }
 }
 
