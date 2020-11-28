@@ -159,6 +159,7 @@ function mapline(gctx,x0,y0,x1,y1,a,b,c) {    // map and plot lines
 }  
 
 var t = 0;	// mapping stepper; sinh(t) is mapping parameter
+var dt = 1/128;
 var I;	// interval timer
 var F;  // step function
 
@@ -196,8 +197,16 @@ function init() {
 	mapplot(gctx,X,X.map(eval(o.getAttribute('func'))),xa,ya,getComputedStyle(o).color);
       }
     };
-    if (a == Infinity) clearInterval(I);	// end at ln
-    t += 1/128;    // step
+  };
+  F();
+}
+
+function stepF() {
+  if (dt<0 ? t<=0 : Math.sinh(t)==Infinity) {
+    stop();
+    reverse();    // auto reverse
+  } else {
+    t += dt;    // step
   }
   F();
 }
@@ -205,19 +214,12 @@ function init() {
 function go() {
   document.getElementById('go').disabled = true;
   I = clearInterval(I);
-  I = setInterval(F, 1);
+  I = setInterval(stepF, 1);
 }
 
 function step() {
   stop();
-  F();
-}
-
-function unstep() {
-  if (!I && t) {
-    t -= 1/128;
-    F();
-  }
+  stepF();
 }
 
 function stop() {
@@ -239,7 +241,15 @@ function toggle(o) {
   } else {
     o.className = c.slice(0,i);
   }
-  unstep();
+  F();
+}
+
+function reverse() {
+  dt *= -1;
+  document.getElementById('lblx').innerHTML =
+    dt<0 ? 'lin&larr;log x' : 'lin&rarr;log x';
+  document.getElementById('lbly').innerHTML =
+    dt<0 ? 'lin&larr;log y' : 'lin&rarr;log y';
 }
 
 </script>
@@ -255,6 +265,7 @@ function toggle(o) {
 .orange {color:rgba(255,127,0,1);}
 .gray {color:rgba(127,127,127,1);}
 #curves span {font-size:2em;}
+#t {width:9em;}
 </style>
 
 </head>
@@ -275,7 +286,12 @@ function toggle(o) {
    </p>
    <button type='button' id='go' onClick='go()'>GO</button>
    <button type='button' onClick='step()'>STEP</button>&nbsp;
-   <label>t:<input id='t' type='text' onChange='newt(this.value)' onFocus='stop()'/></label>
-   &nbsp;<label>lin&rarr;log x<input type='checkbox' id='logx' onChange='unstep()'></label>&nbsp;<label>lin&rarr;log y<input type='checkbox' id='logy' onChange='unstep()' checked></label>
+   <label for='t'>t:</label>
+   <input id='t' type='text' onChange='newt(this.value)' onFocus='stop()'/>&nbsp;
+   <label id='lblx' for='logx'>lin&rarr;log x</label>
+   <input type='checkbox' id='logx' onChange='F()'>&nbsp;
+   <label id='lbly' for='logy'>lin&rarr;log y</label>
+   <input type='checkbox' id='logy' onChange='unF()' checked>&nbsp;&nbsp;
+   <button type='button' onClick='reverse()'>REVERSE</button>
 </body>
 </html>
