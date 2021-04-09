@@ -885,6 +885,18 @@ function speedtoggle(e) {
   return false;
 }
 
+function speedtouch(e) {
+  var pos = getPosition(e);
+  var targpos = speed2pos(speed);
+  if (Math.abs(pos[0]-targpos) < 10) {
+    $("#speed").css('cursor','crosshair')
+    speededit = true;
+  }
+  drawSpeed();
+  e.stopPropagation();
+  return false;
+}
+
 /*****************************************************************
    walls parameters:
      endpoint vectors
@@ -1476,6 +1488,7 @@ $("#speed").bind({mouseenter:speedfocus,
 		  mouseleave:speedblur,
 		  mousemove:setSpeed,
 		  mouseup:speedblur,
+		  touchstart:speedtouch,
 		  mousedown:speedtoggle});
 
 selectedItem = [0,0];
