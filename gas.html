@@ -1475,7 +1475,8 @@ drawSpeed();
 $("#speed").bind({mouseenter:speedfocus,
 		  mouseleave:speedblur,
 		  mousemove:setSpeed,
-		  click:speedtoggle});
+		  mouseup:speedblur,
+		  mousedown:speedtoggle});
 
 selectedItem = [0,0];
 $("#gas").bind({mousemove:updatePosition,
