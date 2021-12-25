@@ -29,6 +29,16 @@ var W=1024;  // width of canvas
 var X=Math.floor(W/2/R);    // number of qubits per row
 var dY=2*R+2*F;    // distance between swaths
 
+function toggle(s) {
+  var e = document.getElementById(s);
+  if (e.style.display == 'none') {
+    e.style.display = 'block';
+    if (e.offsetTop>window.innerHeight) e.scrollIntoView();
+  } else {
+    e.style.display = 'none';
+  }
+}
+
 function clearcontext(c) {
   c.clearRect(0,0,c.canvas.width,c.canvas.height);
 }
@@ -959,6 +969,7 @@ function negate(c) {    // negate amplitude of bit combo c
   <label for="loadFile">Load from file:</label>
   <input type="file" accept=".qco" id="loadFile" onChange="loadFiles(this)"/>&nbsp;&nbsp;
   <button type="button" id="save2window" onClick="save2popup(this)">SHOW AS TEXT</button>
+  <div style='display:inline;padding-left:8em;'><button type="button" onClick="toggle('help')">HELP</button></div>
   <hr>
   <div id="dos" style="margin-bottom:3px">
     &nbsp;&nbsp;&nbsp;&nbsp;
@@ -978,5 +989,82 @@ function negate(c) {    // negate amplitude of bit combo c
   <canvas id="qubits" width="1024" height="32" onclick="qclick(event)"></canvas>  <br>
   <div><div><button id="all" button type='button' disabled onclick='doall()'>All</button></div></div>
   <canvas id="combos" width="1024" height="512" onclick="cclick(event)"></canvas>
+<div id='help' style='display:none'>
+<p>The banner at the top shows a Title, a button to Load from file (file type .qco) a sequence of operations (<a href='#grover'>example</a>), and a button to pop up a window showing the running history of operations.</p>
+<p>Below the banner is a set of buttons for various quantum operations. Clicking a button selects its operation. When a selected operation requires the specification of one or more qubits, it is highlighted until the requisite number of qubits is selected.</p>
+<p>Below the buttons is a set of qubits (initially a single qubit) numbered starting at 0, with each qubit shown above its number as a vertical bar whose height indicates the probability that it will be read as a 1.</p>
+<p>For operations that require the specification of one or more qubits, the qubits can be clicked; if more qubits must be specified, the already-selected qubits are highlighted. Some operations allow all (remaining) qubits to be selected; the All button performs that function.</p>
+    <p>Below the qubits is shown the actual state of the quantum computer as a set of amplitudes, one for each conventional bit configuration, and labeled in hex with that bit configuration. The squared magnitudes of all the amplitudes sum to 1. Each amplitude is a complex number, and is shown as a partially filled in unit circle with a white-and-gray radial line showing the phase. The radius of the filled-in portion of the circle is the magnitude of the amplitude, so the filled-in area is the probability of the corresponding bit configuration. The length of the white portion of the phase line is a sigmoid function of the probability, allowing a more precise differentiation of probabilities close to 0 or 1.</p>
+<table><tr><th colspan=2 style='text-align:left;padding-left:2em;'>Description of operations</th></tr>
+<tr><td>Mark</td><td> place a mark in the history so that subsequent operations can be handled as a group</td></tr>
+<tr><td style='min-width:8em;'>Repeat from Mark</td><td>perform the sequence of operations starting with the last mark</td></tr>
+<tr><td>Undo to Mark</td><td>undo the sequence of operations starting with the last mark</td></tr>
+<tr><td>Redo to Mark</td><td>redo the sequence of operations that were undone.</td></tr>
+<tr><td>Undo</td><td>undo the last operation</td></tr>
+<tr><td>Redo</td><td>redo the operation just undone</td></tr>
+<tr><td>Undo Set</td><td>undo a sequence of the same operation applied to multiple qubits</td></tr>
+<tr><td>Redo Set</td><td>redo a sequence of the same operation applied to multiple qubits</td></tr>
+<tr><td>Undo All</td><td>undo all operations</td></tr>
+<tr><td>Redo All</td><td>redo all operations</td></tr>
+<tr><td></td></tr>
+<tr><td>+qubit</td><td>add a qubit, initialized to Hadamard(0)</td></tr>
+<tr><td>Read</td><td>read a qubit, causing it to be either 0 or 1.</td></tr>
+<tr><td>Clear</td><td>read a qubit, and if the result is 1, apply Not.</td></tr>
+<tr><td></td></tr>
+<tr><td>Hadamard</td><td>apply a Hadamard gate to a qubit, <i>i.e.</i>, the amplitude of 0 becomes the normalized sum of the amplitudes of 0 and 1, while the amplitude of 1 becomes the normalized difference of the amplitudes of 0 and 1.</td></tr>
+<tr><td>Not</td><td>apply a Not gate to a qubit, <i>i.e.</i>, invert the qubit, <i>i.e.</i>, swap the amplitudes of 0 and 1</td></tr>
+<tr><td>Y</td><td>apply a Y gate, <i>i.e.</i>, swap the amplitudes of 0 and 1 and rotate them by pi/2.</td></tr>
+<tr><td>Pi/2</td><td>apply a Pi/2 gate to a qubit, <i>i.e.</i>, rotate the amplitude of 1 by pi.</td></tr>
+<tr><td>Pi/4</td><td>apply a Pi/4 gate to a qubit, <i>i.e.</i>, rotate the amplitude of 1 by pi/2.</td></tr>
+<tr><td>Pi/8</td><td>apply a Pi/8 gate to a qubit, <i>i.e.</i>, rotate the amplitude of 1 by pi/4.</td></tr>
+<tr><td>Not/2</td><td>apply "half" a Not gate to a qubit. (Applying this twice is the same as applying Not once.)</td></tr>
+<tr><td>Negate0</td><td>negate the amplitude of the 0 state of a qubit.</td></tr>
+<tr><td>CNot</td><td>apply Controlled Not gate to a pair of qubits, <i>i.e.</i>, invert the second qubit if the first is 1.</td></tr>
+<tr><td>Swap</td><td>swap a pair of qubits.</td></tr>
+<tr><td>Swap/2</td><td>apply "half" a Swap gate to a pair of qubits.</td></tr>
+<tr><td>iSwap</td><td>like swap, but rotate the phase of the 01 and 10 states by pi/2.</td></tr>
+<tr><td>iSwap/2</td><td>apply "half' an iSwap gate to a pair of qubits.</td></tr>
+<tr><td>CCNot</td><td>apply a Toffoli gate to a triple of qubits, <i>i.e.</i>, invert the third qubit if the first two are 1.</td></tr>
+<tr><td>CSwap</td><td>swap the second and third qubits if the first is 1.</td></tr>
+<tr><td>NotIf0</td><td>apply Not to selected qubit if all other qubits are 0.</td></tr>
+<tr><td>
+<tr><td>Negate</td><td>negate the amplitude of the selected bit configuration. Select by clicking a state circle.</td></tr></table>
+
+<style>
+p.s{font-family:"Lucida Console";font-size:9pt;text-align:left;line-height:9pt;margin:0 0 0 2em;}
+</style>
+<p id='grover'>Example of a file containing one step of Grover's Algorithm:</p>
+<p class='s'>Grover(5,0xa)<br>
++qubit<br>
++qubit<br>
++qubit<br>
++qubit<br>
++qubit<br>
+Clear 5<br>
+Mark<br>
+Not 1<br>
+Not 3<br>
+NotIf0 5<br>
+Pi/2 5<br>
+NotIf0 5<br>
+Not 1<br>
+Not 3<br>
+Hadamard 0<br>
+Hadamard 1<br>
+Hadamard 2<br>
+Hadamard 3<br>
+Hadamard 4<br>
+NotIf0 5<br>
+Not 5<br>
+Pi/2 5<br>
+Not 5<br>
+NotIf0 5<br>
+Hadamard 0<br>
+Hadamard 1<br>
+Hadamard 2<br>
+Hadamard 3<br>
+Hadamard 4<br>
+Mark<br>
+</div>
 </body>
 </html>
