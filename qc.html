@@ -428,7 +428,7 @@ var opdict = {    // name->(op function, inverse op function, #args [each a qubi
   'Clear':[clear,unread,1],
   'Hadamard':[hadamard,hadamard,1],
   'Not':[xgate,xgate,1],
-  'Y':[ygate,etagy,1],
+  'Y':[ygate,ygate,1],
   'Pi/2':[zgate,zgate,1],
   'Pi/4':[pi4,tpi4,1],
   'Pi/8':[pi8,spi8,1],
@@ -738,7 +738,7 @@ function xgate(b) {    // apply not gate to bit b: |0> -> |1>, |1> -> |0>
     }      
 }
 
-function ygate(b) {    // apply y gate to bit b: |0> -> i|1>, |1> -> i|0>
+function ygate(b) {    // apply y gate to bit b: |0> -> i|1>, |1> -> -i|0>
   var i;
   bb = 1<<b;
   for (i=N;i--;)
@@ -747,19 +747,6 @@ function ygate(b) {    // apply y gate to bit b: |0> -> i|1>, |1> -> i|0>
       state[i] = state[i-bb];
       state[i-bb] = s;
       cmuli(state[i],1);
-      cmuli(state[i-bb],1);
-    }
-}
-
-function etagy(b) {    // undo y gate
-  var i;
-  bb = 1<<b;
-  for (i=N;i--;)
-    if (i&bb) {
-      var s = state[i];
-      state[i] = state[i-bb];
-      state[i-bb] = s;
-      cmuli(state[i],-1);
       cmuli(state[i-bb],-1);
     }
 }
@@ -1013,7 +1000,7 @@ function negate(c) {    // negate amplitude of bit combo c
 <tr><td></td></tr>
 <tr><td>Hadamard</td><td>apply a Hadamard gate to a qubit, <i>i.e.</i>, the amplitude of 0 becomes the normalized sum of the amplitudes of 0 and 1, while the amplitude of 1 becomes the normalized difference of the amplitudes of 0 and 1.</td></tr>
 <tr><td>Not</td><td>apply a Not gate to a qubit, <i>i.e.</i>, invert the qubit, <i>i.e.</i>, swap the amplitudes of 0 and 1</td></tr>
-<tr><td>Y</td><td>apply a Y gate, <i>i.e.</i>, swap the amplitudes of 0 and 1 and rotate them by pi/2.</td></tr>
+<tr><td>Y</td><td>apply a Y gate, <i>i.e.</i>, swap the amplitudes of 0 and 1 then rotate 0 by -pi/2 and 1 by pi/2.</td></tr>
 <tr><td>Pi/2</td><td>apply a Pi/2 gate to a qubit, <i>i.e.</i>, rotate the amplitude of 1 by pi.</td></tr>
 <tr><td>Pi/4</td><td>apply a Pi/4 gate to a qubit, <i>i.e.</i>, rotate the amplitude of 1 by pi/2.</td></tr>
 <tr><td>Pi/8</td><td>apply a Pi/8 gate to a qubit, <i>i.e.</i>, rotate the amplitude of 1 by pi/4.</td></tr>
