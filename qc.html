@@ -97,7 +97,9 @@ function showstate() {
     ctx.lineWidth = 1;
     ctx.strokeStyle = 'black';
     ctx.stroke();
-    ctx.fillText(i.toString(16).toUpperCase(),x*2*R+R,y*dY+2*R+F);
+    var s = n<7 ? (N+i).toString(2).slice(1).split('').reverse().join('') :
+		i.toString(16).toUpperCase();
+    ctx.fillText(s,x*2*R+R,y*dY+2*R+F);
     if (a) {
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -981,7 +983,7 @@ function negate(c) {    // negate amplitude of bit combo c
 <p>Below the banner is a set of buttons for various quantum operations. Clicking a button selects its operation. When a selected operation requires the specification of one or more qubits, it is highlighted until the requisite number of qubits is selected.</p>
 <p>Below the buttons is a set of qubits (initially a single qubit) numbered starting at 0, with each qubit shown above its number as a vertical bar whose height indicates the probability that it will be read as a 1.</p>
 <p>For operations that require the specification of one or more qubits, the qubits can be clicked; if more qubits must be specified, the already-selected qubits are highlighted. Some operations allow all (remaining) qubits to be selected; the All button performs that function.</p>
-    <p>Below the qubits is shown the actual state of the quantum computer as a set of amplitudes, one for each conventional bit configuration, and labeled in hex with that bit configuration. The squared magnitudes of all the amplitudes sum to 1. Each amplitude is a complex number, and is shown as a partially filled in unit circle with a white-and-gray radial line showing the phase. The radius of the filled-in portion of the circle is the magnitude of the amplitude, so the filled-in area is the probability of the corresponding bit configuration. The length of the white portion of the phase line is a sigmoid function of the probability, allowing a more precise differentiation of probabilities close to 0 or 1.</p>
+    <p>Below the qubits is shown the actual state of the quantum computer as a set of amplitudes, one for each conventional bit configuration, and labeled in binary (big-endian) or hex (little-endian) with that bit configuration. The squared magnitudes of all the amplitudes sum to 1. Each amplitude is a complex number, and is shown as a partially filled in unit circle with a white-and-gray radial line showing the phase. The radius of the filled-in portion of the circle is the magnitude of the amplitude, so the filled-in area is the probability of the corresponding bit configuration. The length of the white portion of the phase line is a sigmoid function of the probability, allowing a more precise differentiation of probabilities close to 0 or 1.</p>
 <table><tr><th colspan=2 style='text-align:left;padding-left:2em;'>Description of operations</th></tr>
 <tr><td>Mark</td><td> place a mark in the history so that subsequent operations can be handled as a group</td></tr>
 <tr><td style='min-width:8em;'>Repeat from Mark</td><td>perform the sequence of operations starting with the last mark</td></tr>
