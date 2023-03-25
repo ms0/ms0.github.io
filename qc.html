@@ -659,7 +659,7 @@ function qclick(e) {    // click on qubit canvas
 	qtx.moveTo(R+q*2*R,R);
 	qtx.lineTo(R+q*2*R,0);
 	qtx.stroke();
-	if (a-1 == args.length) allbtn.disabled=false;
+	if (a-1 == args.length && pop != 'QFT') allbtn.disabled=false;
       } else dodo(pop,args);
     }
   }
