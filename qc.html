@@ -444,6 +444,7 @@ var opdict = {    // name->(op function, inverse op function, #args [each a qubi
   'CCNot':[ccnot,ccnot,3],
   'CSwap':[cswap,cswap,3],
   'NotIf0':[notif0,notif0,1],
+  'QFT':[fqft,rqft,2],
   'Negate':[negate,negate,-1]    // arg is specific bit combo
 }
 
@@ -950,6 +951,73 @@ function notif0(b) {    // apply not to b if all other bits zero
 function negate(c) {    // negate amplitude of bit combo c
   cmulr(state[c],-1);
 }
+
+function fqft(b,c) {
+  rqft(b,c,true);
+}
+    
+function rqft(b,c,fwd) {    // perform qft on range of qubits (lo then hi)
+  var n = Math.abs(c-b)+1;    // number of qubits
+  var N = 1<<n;    // 2^n
+  var R = [];
+  var I = [];    
+  var i,j;
+  for (i=0; i<N; i++) {
+    j = b<c ? i : bit_reverse(i,n);
+    R[i] = state[j][0];
+    I[i] = state[j][1];
+  } 
+  dft(R,I,fwd);    // note that QFT forward is dft reverse
+  for (i=0; i<N; i++) {
+    j = b<c ? i : bit_reverse(i,n);
+    state[j][0] = R[i];
+    state[j][1] = I[i];
+  } 
+}
+
+function bit_reverse(x,l) {for (y=0; l--; x>>=1)  y = (y<<1)|(x&1); return y;}
+
+function dft(R,I,rev) {    // in-place DFT
+  var N = R.length;
+  var l = Math.log2(N);
+  var i,j,k,n;
+  var t,x,y;
+  var wi,wr;
+  for (i=0; i<N; i++) {
+    j = bit_reverse(i,l);
+    if (i<j) {
+      var t = R[i];
+      R[i] = R[j];
+      R[j] = t;
+      t = I[i];
+      I[i] = I[j];
+      I[j] = t;
+    }
+  }
+  for (i=0; i<l; i++) {
+    n = 1<<i;
+    for (j=0; j<n; j++) {
+      wr = Math.cos(Math.PI*j/n);
+      wi = Math.sin(Math.PI*j/n);
+      if (!rev) wi = -wi;
+      for (k=j; k<N; k+=n<<1) {
+	x = R[k+n]*wr-I[k+n]*wi;
+	y = I[k+n]*wr+R[k+n]*wi;
+	t = R[k]-x;
+	R[k] += x;
+	R[k+n] = t;
+	t = I[k]-y;
+	I[k] += y;
+	I[k+n] = t;
+      }
+    }
+  }
+  var vN = Math.sqrt(N);
+  for (i=0; i<N; i++) {
+    R[i] /= vN;
+    I[i] /= vN;
+  }
+}
 </script>
 </head>
 <body onload="initdisplay()">
@@ -1012,11 +1080,12 @@ function negate(c) {    // negate amplitude of bit combo c
 <tr><td>Swap</td><td>swap a pair of qubits.</td></tr>
 <tr><td>Swap/2</td><td>apply "half" a Swap gate to a pair of qubits.</td></tr>
 <tr><td>iSwap</td><td>like swap, but rotate the phase of the 01 and 10 states by pi/2.</td></tr>
-<tr><td>iSwap/2</td><td>apply "half' an iSwap gate to a pair of qubits.</td></tr>
+<tr><td>iSwap/2</td><td>apply "half" an iSwap gate to a pair of qubits.</td></tr>
 <tr><td>CCNot</td><td>apply a Toffoli gate to a triple of qubits, <i>i.e.</i>, invert the third qubit if the first two are 1.</td></tr>
 <tr><td>CSwap</td><td>swap the second and third qubits if the first is 1.</td></tr>
 <tr><td>NotIf0</td><td>apply Not to selected qubit if all other qubits are 0.</td></tr>
-<tr><td>
+<tr><td></td></tr>
+<tr><td>QFT</td><td>apply Quantum Fourier Transform to selected qubits. Select lo order then hi order qubit.</td></tr>
 <tr><td>Negate</td><td>negate the amplitude of the selected bit configuration. Select by clicking a state circle.</td></tr></table>
 
 <style>
