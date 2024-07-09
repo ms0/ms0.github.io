@@ -1,0 +1,1012 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>Rubik's Cube</title>
+<script>
+/* questions:
+   how do we specify the colors of the faces of each cube ?
+   how do we tell which cube face is on a particular rubik face ?
+   how do we show the orientation of the center cube on each face ? >^<v
+*/
+
+var pw=0;    // popup window
+
+/****************************************************************
+ rubic cube emulation
+ There are 26 cubes:
+   6 are center cubes and can only rotate (4 states each)
+   8 are corner cubes and can be moved to any corner position in each of 3 orientations (24 states each)
+  12 are edge cubes, and can be moved to any edge position in each of 2 orientations (24 states each)
+ There are 6 primitive moves: rotating a face cw 90 degrees,
+ and of course their inverses (another 6), and their squares (another 6)
+
+Number of states producible, including by setup:
+4 8! 3^8 12! 2^12 = 2076096157175513088000, requiring 71 bits
+We can number a permutation by writing it in a factorial number system. This means providing an ordinal to each corner position and color triple, and to each edge position and color double, presumable by ordering positions and colors. Positions are given by face-row-column, so lexicographic order is fine. Colors can use their home face numbers.
+Unfortunately, 71 is more bits than we have in a javascript number, so we'll probably need to use strings to identify each possible state. That's not necessarily a bad thing. We can be more verbose and make the computation easier.
+One possibility is just a string of colors, face by face. So each of the 48 facelets can have one of six colors. That's slightly over 124 bits, but of course includes many non-realizable configurations.
+Canonical ordering of states? There are 6 selections for top face, 4 rotations about that face, and 2 reflections of cube, for a total of 6*4*2=48 color permutations with corresponding move transformations. Nonadjacent faces: 0-5,1-3,2-4. Canonicalize by making first color 0, next adjacent color 1, next adjacent color 2; other colors are then determined. Need to store original colors. CC vs CW may change in path. It's more complicated than this, because relation between individual facelets changes.
+
+Note that we keep the center (hidden) cube fixed
+
+There are 54 facelets. Keeping track of the facelet colors (and face center orientations) seems like an easier approach. Facelets are identified by their center color. All the other faces just need their colors.
+
+Colors and center orientation are transformed according to which face is being rotated and by how much. 
+
+What datastructure do we need?
+  An array to keep track of move history. Note that backing up is very easy, as each move is trivially reversible.
+
+  For each cube, its state.
+  OR, for each position, its contents and state.
+  How do we represent a cube's state? If we consider its natural orientation, then we can just specify its rotation from that orientation. There are 24 orientations (8 corners * 3 rotations about corner, or 6 faces * 4 plane rotations, 12 edges * 2 flips)
+
+  If we use coordinates for the cubes, we can use normal 3-d transformations...
+center cubes at x,y,z such that two are 0 and one is +-1; corner cubes such that each of the three are +-1; edge cubes such that one is 0 and the two others are +-1. And the same 3d transforms indicate the orientation of the cubes. We apply the transform to a single face.
+
+What routines do we need?
+  A routine to perform a move (and save the move)
+  A routine to display the rubik cube in its current state
+  A routine to perform a programmed sequence of moves
+  A routine to invert a sequence of moves
+UI: Center cubelet has arrow indicating its cumulative rotation, initially an uparrow. Clicking an edge cubelet on a face rotates that face so that arrow points to that cubelet.
+  Clicking on center cubelet of any face makes that face the "center" of the display. This requires repositioning each cubelet. We leave the arrows unchanged, so that an uparrow always indicates that the center cubelet is in its initial orientation. If we click on the center face, we rotate the entire cube clockwise about that face, again leaving the arrows unchanged.
+  Need mapping from face-row-column to x,y: face->(x,y) offset, and for each face, r,c -> (x,y) offset (with original positioning, r,c translates to top, left, respectively), but that is no longer true with a different face at center. It's simpler if we keep G,R,B,O orientation unchanged when we make them the central face, leaving just W and Y to rotate. But if we allow not only which face is the center, but it's orientation, then there are 24 possible configurations.
+
+Display? Coordinates: R +z, O -z, B +x, G -x, W +y, Y -y
+
+Faces 0=W, 1=G, 2=R, 3=B, 4=O, 5=Y
+
+                 --- --- ---
+                |0-0|0-1|0-2|
+                 --- --- ---
+                |1-0|1W1|1-2|
+                 --- --- ---
+                |2-0|2-1|2-2|
+                 --- --- ---
+   --- --- ---   --- --- ---   --- --- ---   --- --- ---
+  |0-0|0-1|0-2| |0-0|0-1|0-2| |0-0|0-1|0-2| |0-0|0-1|0-2|
+   --- --- ---   --- --- ---   --- --- ---   --- --- --- 
+  |1-0|1G1|1-2| |1-0|1R1|1-2| |1-0|1B1|1-2| |1-0|1O1|1-2|
+   --- --- ---   --- --- ---   --- --- ---   --- --- ---
+  |2-0|2-1|2-2| |2-0|2-1|2-2| |2-0|2-1|2-2| |2-0|2-1|2-2|
+   --- --- ---   --- --- ---   --- --- ---   --- --- ---
+                 --- --- ---
+                |0-0|0-1|0-2|
+                 --- --- ---
+                |1-0|1Y1|1-2|
+                 --- --- ---
+                |2-0|2-1|2-2|
+                 --- --- ---
+
+Linear order of faces: W G R B O Y
+
+Interactions:
+ W    W    W    W    R    Y
+OGR  GRB  RBO  BOG  GYB  GWB
+ Y    Y    Y    Y    W    R
+
+History consists of sequence of 4*f+r (f=face: 0 thru 5, r=cwrotation: 0 thru 3)
+We elide 0 rotations.
+
+Each facelet is given by face-row-column: face 0 thru 5, row and column 0 thru 2.
+Each face has a position [face2pos] (0 thru 5) and a rotation [facerot] (0 thru 3).
+Initially, rotations are all 0, and position number and face numbers match.
+               0
+  Positions: 1 2 3 4
+               5
+When we click on a face center, we update positions and rotations of each face.
+Clicking on a face that is already at position 2 rotates the cube clockwise about that face;
+this causes some of the other faces to rotate in the 2D unfolding.
+Clicking on a face that is not at position 2 moves it to position 2 without rotating it,
+but other faces may rotate as they change position in the 2D unfolding.
+posefaces() positions each face at its 2D unfolded position and orientation.
+The arrows shown on the center of each face do not rotate for different unfoldings;
+they show the state of rotation of the face centers relative to their initial state (^).
+
+****************************************************************/
+
+var cnum = {};    // color -> number (derived from facecolors)
+
+var moves = [];    // list of moves
+var mp = 0;    // moves position
+
+var cwbes = ['-0-0','-0-1','-0-2','-1-2','-2-2','-2-1','-2-0','-1-0'];
+
+var corners = ['0-0-0 1-0-0 4-0-2',    // clockwise
+	       '0-0-2 4-0-0 3-0-2',
+	       '0-2-2 3-0-0 2-0-2',
+	       '0-2-0 2-0-0 1-0-2',
+	       '5-0-0 1-2-2 2-2-0',
+	       '5-0-2 2-2-2 3-2-0',
+	       '5-2-2 3-2-2 4-2-0',
+	       '5-2-0 4-2-2 1-2-0'];
+
+var edges = ['0-0-1 4-0-1',
+	     '0-1-2 3-0-1',
+	     '0-2-1 2-0-1',
+	     '0-1-0 1-0-1',
+	     '5-0-1 2-2-1',
+	     '5-1-2 3-2-1',
+	     '5-2-1 4-2-1',
+	     '5-1-0 1-2-1',
+	     '1-1-0 4-1-2',
+	     '1-1-2 2-1-0',
+	     '3-1-0 2-1-2',
+	     '3-1-2 4-1-0'];
+
+var ot;    // orientation text (up, right, down, left)
+
+var facecenter = [];    // array of center squares
+var orient = [];        // array of center square orientations
+
+// cube order on each face: 0-0(3) 0-1(2) 0-2(3) 1-2(2) 2-2(3) 2-1(2) 2-0(3) 1-0(2)
+var face = [];    // array of arrays of divs where colors reside
+
+// for display...
+var face2pos=[];    // position of faces, initially identity map
+var pos2face=[];    // face in each position (inverse of face2pos)
+var facerot=[];     // rotation of faces, initially all 0
+var posoffx = [1,0,1,2,3,1];
+var posoffy = [0,1,1,1,1,2];
+var facecolor = ['white','green','red','blue','orange','yellow'];
+
+var cubelet;    // selected cubelet to be recolored in setup
+
+var faces = [];    // cubelet shown in setup
+
+var no3d = 0;         // set to disable show3d
+var ctx;              // canvas for 3d representation
+var HEXSIZE = 192;    // size of 3d canvas
+
+var savestack = [];
+
+function savemovestate() {
+  savestack.push(moves.slice(mp));
+  moves.length = mp;
+}
+
+function restoremovestate() {
+  moves.length = mp;
+  moves.push(...savestack.pop());
+}
+
+function classes(c) {
+  return Array.from(document.getElementsByClassName(c));
+}
+
+function oc2state() {    // compute state from orient and colors
+  var i,f,r,c;
+  var s = [];
+  i = 6;
+  for (f=0; f<6; f++) {
+    s[f] = ot.search(orient[f].textContent);
+    for (r=0; r<3; r++) {
+      for (c=0; c<3; c++) {
+        if (r*c != 1) {
+	  o = document.getElementById(f+'-'+r+'-'+c);
+	  s[i++] = cnum[o.style.backgroundColor];
+        }
+      }
+    }
+  }
+  return s.join('');
+}
+
+function state2oc(s) {    // update orient and colors from state s
+  var i,f,r,c;
+  i = 6;
+  for (f=0; f<6; f++) {
+    orient[f].textContent = ot[s[f]];
+    for (r=0; r<3; r++) {
+      for (c=0; c<3; c++) {
+        if (r*c != 1) {
+	  o = document.getElementById(f+'-'+r+'-'+c);
+	  o.style.backgroundColor = facecolor[s[i++]];
+        }
+      }
+    }
+  }
+}
+
+function findcubes(id) {    // get ids of all faces of cubelet
+  var i,j,a;
+  for (i in corners) {
+    a = corners[i].split(' ');
+    for (j in a) {
+      if (a[j] == id) {
+	return [a[j],a[(j+1)%3],a[(j+2)%3]];
+      }
+    }
+  }
+  for (i in edges) {
+    a = edges[i].split(' ');
+    for (j in a) {
+      if (a[j] == id) {
+	return [a[j],a[j^1]];
+      }
+    }
+  }
+  alert('findcubes failed');
+}
+
+function init() {    // build data structures
+  // create face array from corners and edges
+  var f,c,i;
+  ctx = document.getElementById('cube3d').getContext('2d');
+  ot = document.getElementById('ot').textContent;    // orientation text
+  for (f = 0; f < 6; f++) {
+    face[f] = [];
+    for (c in cwbes) {
+      face[f].push(...findcubes(f+cwbes[c]));
+    }
+    for (i in face[f]) {
+      face[f][i] = document.getElementById(face[f][i]);
+    }
+    facecenter[f] = document.getElementById(f+'-1-1');
+    orient[f] = facecenter[f].firstChild;
+    orient[f].innerHTML = ot[0];
+  }
+  face2pos = [0,1,2,3,4,5];
+  facerot = [0,0,0,0,0,0];
+  faces[0] = document.getElementById('f0');
+  faces[1] = document.getElementById('f1');
+  faces[2] = document.getElementById('f2');
+  for (i in facecolor) cnum[facecolor[i]]=+i;
+}
+
+function cinit() {    // initialize cubelet colors and classes
+  var o,f,r,c;
+  for (f=0; f<6; f++) {
+    for (r=0; r<3; r++) {
+      for (c=0; c<3; c++) {
+	o = document.getElementById(f+'-'+r+'-'+c);
+	o.style.backgroundColor = facecolor[f];
+	o.className = (r^c)&1 ? 'edge' : r*c==1 ? 'center' : 'corner';
+      }
+    }
+  }
+}
+
+function uinit() {    // initialize UI (click listeners)
+  var o,f,r,c;
+  for (f=0; f<6; f++) {
+    for (r=0; r<3; r++) {
+      for (c=0; c<3; c++) {
+	o = document.getElementById(f+'-'+r+'-'+c);
+	if ((r^c)&1) o.addEventListener('click', rotate);
+	if (r*c==1) o.addEventListener('click', select);
+	o.style.cursor = (r|c)&1 ? 'context-menu' : 'not-allowed';
+      }
+    }
+    for (r=1; r<4; r++) {
+      o = document.getElementById(f+'-'+r);
+      o.addEventListener('click',rotbut);
+    }
+  }
+  o = classes('face');
+  for (c in o) o[c].style.backgroundColor = 'transparent';
+}
+
+function rotate(event) {
+  // rotate clicked-on face by updating outside colors and center orientation symbol
+  var c = event.target.parentNode;
+  var f = +c.id[0];
+  var dx = c.offsetLeft-facecenter[f].offsetLeft;
+  var dy = facecenter[f].offsetTop-c.offsetTop;
+  var o = dy > 0 ? 0 : dy < 0 ? 2 : dx > 0 ? 1 : 3;
+  var r = (o-ot.search(orient[f].textContent))&3 ;
+  if (r) dodo(f,r);
+}
+
+function rotbut(event) {
+  // rotate according to button
+  var t = event.target.id;
+  var f = +t[0];
+  var r = +t[2];
+  dodo(f,r);
+
+}
+
+// in units of pixels :
+var CUBEMARGIN = 5;
+var CUBELETSIZE = 20;    // width and height of cubelet div
+var CUBELETGAP = 1;      // gap between cubelets
+var CUBELETSPACE = CUBELETSIZE+CUBELETGAP;
+var CUBESIZE = 3*CUBELETSPACE;
+
+function posefaces() {
+  var f,r,c,o;
+  var fp;
+  for (f=0; f<6; f++) {
+    fp = face2pos[f];
+    pos2face[fp] = f;
+    for (r=0; r<3; r++) {
+      for (c=0; c<3; c++) {
+	o = document.getElementById(f+'-'+r+'-'+c);
+	switch (facerot[f]) {
+	case 0:
+	  o.style.left = CUBEMARGIN+posoffx[fp]*CUBESIZE+c*CUBELETSPACE+'px';
+	  o.style.top = CUBEMARGIN+posoffy[fp]*CUBESIZE+r*CUBELETSPACE+'px';
+	  break;
+	case 1:
+	  o.style.left = CUBEMARGIN+posoffx[fp]*CUBESIZE+(2-r)*CUBELETSPACE+'px';
+	  o.style.top = CUBEMARGIN+posoffy[fp]*CUBESIZE+c*CUBELETSPACE+'px';
+	  break;
+	case 2:
+	  o.style.left = CUBEMARGIN+posoffx[fp]*CUBESIZE+(2-c)*CUBELETSPACE+'px';
+	  o.style.top = CUBEMARGIN+posoffy[fp]*CUBESIZE+(2-r)*CUBELETSPACE+'px';
+	  break;
+	case 3:
+	  o.style.left = CUBEMARGIN+posoffx[fp]*CUBESIZE+r*CUBELETSPACE+'px';
+	  o.style.top = CUBEMARGIN+posoffy[fp]*CUBESIZE+(2-c)*CUBELETSPACE+'px';
+	  break;
+	}
+      }
+    }
+  }	
+  show3d();
+}
+
+var COS30 = Math.sqrt(3)/2;
+var SIN30 = 1/2;
+var offsets = [
+  [CUBESIZE+CUBEMARGIN,CUBEMARGIN],
+  [CUBEMARGIN,CUBESIZE+CUBEMARGIN],
+  [CUBESIZE+CUBEMARGIN,CUBESIZE+CUBEMARGIN]
+];
+var transforms = [
+  [COS30,SIN30-1,COS30,SIN30,-COS30*CUBESIZE+HEXSIZE/2,-SIN30*CUBESIZE+HEXSIZE/2],
+  [COS30,SIN30,0,1,-COS30*CUBESIZE+HEXSIZE/2,-SIN30*CUBESIZE+HEXSIZE/2],
+  [COS30,-SIN30,0,1,HEXSIZE/2,HEXSIZE/2]
+];
+
+function show3d() {    // update 3d picture from relevant faces
+  var f,r,c,o;
+  var x,y;
+  var fp;
+  ctx.clearRect(0,0,HEXSIZE,HEXSIZE);
+  for (f=0;f<3;f++) {
+    ctx.setTransform(...transforms[f]);
+    fp = pos2face[f];
+    for (r=0;r<3;r++) {
+      for (c=0;c<3;c++) {
+	o = document.getElementById(fp+'-'+r+'-'+c);	
+	x = o.offsetLeft-offsets[f][0];
+	y = o.offsetTop-offsets[f][1];
+	ctx.fillStyle = o.style.backgroundColor;
+	ctx.fillRect(x,y,CUBELETSIZE,CUBELETSIZE);
+      }
+    }
+  }
+}
+
+function initialize() {
+  var f;    // face
+  var r;    // row
+  var c;    // col
+  var o;    // object
+  o = document.getElementById('setup');
+  o.checked = false;
+  o.addEventListener('change',setup);
+  init();
+  cinit();
+  posefaces();
+  uinit();
+  mp = 0;
+  moves.length = 0;
+  o = document.getElementById('undoall');
+  o.disabled = true;
+  o.addEventListener('click',undoall);
+  o = document.getElementById('redoall');
+  o.disabled = true;
+  o.addEventListener('click',redoall);
+  o = document.getElementById('undo');
+  o.disabled = true;
+  o.addEventListener('click', undo);
+  o = document.getElementById('redo');
+  o.disabled = true;
+  o.addEventListener('click', redo);
+}
+
+function setup() {    // allow moving cubelets around
+  var o;
+  s = document.getElementById('setup').checked;
+  if (s) {
+    show3d();
+    for (f=0; f<6; f++) {
+      for (r=0; r<3; r++) {
+	for (c=0; c<3; c++) {
+	  o = document.getElementById(f+'-'+r+'-'+c);
+	  if ((r^c)&1) o.removeEventListener('click', rotate);
+	  if (!(r&c&1)) {
+	    o.style.cursor = 'move';
+	    o.removeEventListener('click',swap);
+	    o.removeEventListener('click',exch);
+	    o.addEventListener('click',exch);
+	  }
+	}
+      }
+    }
+  } else {
+    for (f=0; f<6; f++) {
+      for (r=0; r<3; r++) {
+	for (c=0; c<3; c++) {
+	  o = document.getElementById(f+'-'+r+'-'+c);
+	  if (!(r&c&1)) {
+	    o.removeEventListener('click',exch);
+	    o.removeEventListener('click',swap);
+	  }
+	}
+      }
+    }
+    uinit();
+  }
+}
+
+function exch(event) {    // begin swap of cubelet
+  var o = event.target.parentNode;
+  var r = o.getBoundingClientRect();
+  var i;
+  cubelet = findcubes(o.id);
+  for (i in cubelet) {
+    cubelet[i] = o = document.getElementById(cubelet[i]);
+    faces[i].style.backgroundColor = o.style.backgroundColor;
+  }
+  o = classes('corner');
+  for (i in o) {
+    o[i].removeEventListener('click',exch);
+    if (cubelet.length < 3) {
+      o[i].style.cursor = 'not-allowed';
+    } else {
+      o[i].addEventListener('click',swap);
+    }
+  }
+  o = classes('edge');
+  for (i in o) {
+    o[i].removeEventListener('click',exch);
+    if (cubelet.length < 3) {
+      o[i].addEventListener('click',swap);
+    } else {
+      o[i].style.cursor = 'not-allowed';
+    }
+  }
+}
+
+function swap(event) {    // finish swap of cubelet
+  var o = event.target.parentNode;
+  var c = findcubes(o.id);
+  if (o != cubelet[0] && o != cubelet[1] && (cubelet.length < 3 || o != cubelet[2])) {
+    for (i in c) {
+      o = document.getElementById(c[i]);
+      cubelet[i].style.backgroundColor = o.style.backgroundColor;
+      o.style.backgroundColor = faces[i].style.backgroundColor;
+      faces[i].style.backgroundColor = 'transparent';
+    }
+  } else {
+    for (i in c) {
+      document.getElementById(c[i]).style.backgroundColor = faces[i].style.backgroundColor;
+      faces[i].style.backgroundColor = 'transparent';
+    }
+  }
+  setup();
+}
+
+function select(event) {    // select face or rotate cube about face
+  var f = +event.target.parentNode.id[0];
+  var i;
+  for (i=0; i<6; i++) pos2face[face2pos[i]] = i;
+  switch (face2pos[f]) {
+  case 2:    // rotate face clockwise
+    move(1,0);
+    move(5,1);
+    move(0,3);
+    move(3,5);
+    rotpos(1);
+    rotpos(4+1);
+    rotpos(2*4+1);
+    rotpos(3*4+1);
+    rotpos(4*4+3);
+    rotpos(5*4+1);
+    break;
+  // all other cases change selected face  
+  case 0:
+    move(4,0);
+    move(0,2);
+    move(5,4);
+    move(2,5);
+    rotpos(1*4+1);
+    rotpos(3*4+3);
+    rotpos(4*4+2);
+    rotpos(5*4+2);
+    break;
+  case 1:
+    move(4,1);
+    move(1,2);
+    move(2,3);
+    move(3,4);
+    rotpos(3);
+    rotpos(5*4+1);
+    break;
+  case 3:
+    move(2,1);
+    move(3,2);
+    move(4,3);
+    move(1,4);
+    rotpos(1);
+    rotpos(5*4+3);
+    break;
+  case 4:
+    move(3,1);
+    move(4,2);
+    move(1,3);
+    move(2,4);
+    rotpos(2);
+    rotpos(5*4+2);
+    break;
+  case 5:
+    move(2,0);
+    move(5,2);
+    move(0,4);
+    move(4,5);
+    rotpos(2);
+    rotpos(4+3);
+    rotpos(3*4+1);
+    rotpos(4*4+2);
+    break;
+  }
+  posefaces();
+}
+
+function move(p,q) {    // move face at position p to position q
+  face2pos[pos2face[p]] = q;
+}
+
+function rotpos(op) {    // rotate position
+  var f = pos2face[op>>2];
+  facerot[f] = (facerot[f]+op)&3;
+}
+
+function rotface(op) {    // do the actual rotation
+  // get the current 8+12 div objects for the face, grouped in 5s
+  // get the colors for each
+  // store the colors to the same divs (rotated a multiple of 5)
+  var f = face[op>>2];
+  var r = (-op&3)*5;
+  var c = [];
+  var i;
+  for (i in f) {
+    c[i] = f[i].style.backgroundColor;
+  }
+  for (i in f) {
+    f[i].style.backgroundColor = c[(+i+r)%20];
+  }
+  orient[op>>2].textContent = ot[(ot.search(orient[op>>2].textContent)+op)&3];
+}
+
+function dodo(face,rot) { // rotate clockwise pi/2 * 0,1,2,3 mod 4
+  rotface(moves[mp++] = face*4+rot%4);
+  moves.length = mp;
+  document.getElementById('undo').disabled = false;
+  document.getElementById('undoall').disabled = false;
+  document.getElementById('redo').disabled = true;
+  document.getElementById('redoall').disabled = true;
+  no3d || show3d();
+  pw && save2popup();
+}
+
+function revrot(op) {
+  return (op&-4)|(-op&3);
+}
+
+function undoall(event) {
+  while (mp) undo(event);
+}
+
+function redoall(event) {
+  while (mp < moves.length) redo(event);
+}
+
+function undo(event) {
+  if (mp) rotface(revrot(moves[--mp]))
+  document.getElementById('redo').disabled = false;
+  document.getElementById('redoall').disabled = false;
+  document.getElementById('undo').disabled = !mp;
+  document.getElementById('undoall').disabled = !mp;
+  no3d || show3d();
+  pw && save2popup();
+}
+
+function redo(event) {
+  if (mp < moves.length) {
+    rotface(moves[mp++]);
+    document.getElementById('undo').disabled = false;
+    document.getElementById('undoall').disabled = false;
+    if (mp >= moves.length) {
+      document.getElementById('redo').disabled = true;
+      document.getElementById('redoall').disabled = true;
+    }
+  }
+  no3d || show3d();
+  pw && save2popup();
+}
+
+/****************************************************************/
+
+function getorder(moveseq,noorient) { // get order of moveseq
+  var i;
+  var s,so;
+  var o = noorient?6:0;
+  var c = 0;
+  no3d = 1;
+  savemovestate();
+  s = oc2state();        // initial state
+  so = s.substr(o);
+  do {    // perform one iteration of moves
+    moves.push(...moveseq);
+    redoall() ;
+    c++;    // count number of iterations to return to s
+  }
+  while (oc2state().substr(o) != so);
+  state2oc(s);
+  mp -= c*moveseq.length;
+  restoremovestate();
+  no3d = 0;
+  return c;
+}
+ 
+/****************************************************************/
+
+function toggle(s) {
+  var e = document.getElementById(s);
+  if (e.style.display == 'none') {
+    e.style.display = 'block';
+    if (e.offsetTop>window.innerHeight) e.scrollIntoView();
+  } else {
+    e.style.display = 'none';
+  }
+}
+
+/****************************************************************
+  history [moves array]:
+  each entry is 4*face+cwrotation: face in [0,5], cwrotation in [1,3]
+  text representation: one of WGRBOY followed by one of 123
+  definitions:      name: sequence
+  individual item is name concatenated with number
+  name may be one of wgrboy, or previously defined name as above
+  number can be any decimal number
+  parameterize macros by mapping faces?
+****************************************************************/
+
+function save2popup(o) {
+  o && o.blur();
+  if (!pw || pw.closed)
+    if (o) {
+      pw = window.open('',title,'height=512,width=64,resizable=1,scrollbars=1');
+    } else {
+      pw = 0;
+      return;
+    }    
+  var title = document.getElementById('title').value;
+  var d = pw.document;
+  var s = d.body.scrollTop;
+  var x = '<html><head><title>'+title+'</title><style>p{font-family:"Lucida Console";font-size:9pt;text-align:left;line-height:9pt;margin:0;}hr{padding:0px;margin:0px;}</style></head><body>';
+  var i;
+  for (i=0; i<=moves.length; i++) {
+    if (i==mp) x += '<hr>';
+    if (i == moves.length) {
+      while (i-- > mp) x += '<p>Undo</p>';
+      break;
+    }
+    var o = moves[i];
+    x += '<p>'+(o&3)+'WGRBOY'[o>>2]+'</p>';
+  }
+  x += '</body></html>';
+  d.write(x);
+  d.close();
+  pw.scrollTo(0,s);
+  setTimeout(function() {
+    pw.focus();
+    var e;
+    var o = d.getElementsByTagName('hr')[0];
+    try {o.scrollIntoViewIfNeeded({behavior:'smooth',block:'center'});}
+    catch (e) {
+      var y = o.offsetTop;
+      var h = pw.innerHeight;
+      (y <= s || y >= s+h) && pw.scrollTo(0, y-h/2);
+    };
+  },1);
+}
+
+function loadFiles(o) {
+  var files = o.files;
+  var i;
+  var f;
+  for (i=0; i < files.length; i++) {
+    var r = new FileReader();
+    r.onloadend = (function(file,o) {
+      return function(e) {
+	loadFile(file,o,e.target.result);
+      }
+    })(files[i],o);
+    r.onerror = function (e) {alert('Read failed!');};
+    r.readAsText(files[i]);
+  }
+  o.value = '';
+}
+
+// this needs to be customized for rubik :
+
+function loadFile(f,o,s) {
+  document.getElementById('title').value = f.name.replace(/\.\w*$/,'');
+  initialize();
+  var dict = {w:0,g:1,r:2,b:3,o:4,y:5,W:0,G:1,R:2,B:3,O:4,Y:5};
+  var op;
+  var i;
+  var c;
+  var line;
+  var lines=s.split("\n");
+  for (i=0; i < lines.length; i++) {
+    line = lines[i].trim();
+    c = line.search('#');
+    if (c >= 0)    // remove comment
+      line = line.slice(0,c).trim();
+    c = line.search(':');    
+    if (c<0) {    // regular commands
+      moves.push(...expand(line,dict));
+      mp = 0;
+    } else {      // definition
+      op = line.slice(0,c).trim();
+      if (/^[A-Za-z_]\w*$/.test(op))
+	dict[line.slice(0,c).trim()] = expand(line.slice(c+1).trim(),dict);
+    }
+  }
+  redoall();
+}
+
+function expand(s,d) {
+  // expand a string into a sequence of base moves
+  // each whitespace-separated token may start with a number
+  // and may end with (xx) where xx is a pair of abutting colors
+  var moves=[];
+  var m;    // mapping of colors
+  var op;
+  var t;
+  var u;
+  var i;
+  var j;
+  var k;    // repeat count
+  var info = document.getElementById('info');
+  if (s) {
+    s = s.split(/\s+/);
+    for (i=0; i<s.length; i++) {
+      t = /^[+-]?\d*/.exec(s[i])[0];
+      k = +(/^[+-]?$/.test(t) ? t+'1' : t); 
+      if (k) {
+	t = s[i].slice(t.length);
+	u = /^[A-Za-z_]\w*/.exec(t)[0];
+	t = t.slice(u.length).toLowerCase();    // is there a transformation?
+	m = (/^\([wgrboy]{2}\)$/.test(t) ? pdict[t.slice(1,3)] : null) || pdict['wg'];
+	op = d[u];
+	if (typeof(op) == typeof(0)) {
+	  moves.push((m[op]<<2)|(k&3));
+	} else if (op) {
+	  if (k<0) {
+	    while (k++) {
+	      for (j=op.length; j--;) {
+		moves.push(mrop(m,op[j]));
+	      }
+	    }
+	  } else {
+	    while (k--) {
+	      for (j=0; j<op.length; j++)
+		moves.push(mop(m,op[j]));
+	    }
+	  }
+	}
+      }
+    }
+  }
+  t = [];
+  if (moves.length > 1) {
+    for (i in moves) {
+      op = moves[i];
+      t.push((op&3)+'WGRBOY'[op>>2]);
+    }
+    t.push(getorder(moves,true));
+    t.push(getorder(moves));
+    info.innerHTML = t.join(' ');
+  }
+  return moves;
+}
+
+function mop(m,op) {
+  return (m[op>>2]<<2)|(op&3);
+}
+
+function mrop(m,op) {
+  return (m[op>>2]<<2)|(-op&3);
+}
+
+// 24 transformations, each a permutation of the 6 faces
+var pdict = {    // permutation dictionary mapping wg to indicated pair
+//      w g r b o y     inverses
+  wg : [0,1,2,3,4,5],    // wg
+  wr : [0,2,3,4,1,5],    // wo
+  wb : [0,3,4,1,2,5],    // wb
+  wo : [0,4,1,2,3,5],    // wr
+  gw : [1,0,4,5,2,3],    // gw
+  gr : [1,2,0,4,5,3],    // rw
+  go : [1,4,5,2,0,3],    // ow
+  gy : [1,5,2,0,4,3],    // bw
+  rw : [2,0,1,5,3,4],    // gr
+  rg : [2,1,5,3,0,4],    // og
+  rb : [2,3,0,1,5,4],    // rb
+  ry : [2,5,3,0,1,4],    // bo
+  bw : [3,0,2,5,4,1],    // gy
+  br : [3,2,5,4,0,1],    // oy
+  bo : [3,4,0,2,5,1],    // ry
+  by : [3,5,4,0,2,1],    // by
+  ow : [4,0,3,5,1,2],    // go
+  og : [4,1,0,3,5,2],    // rg
+  ob : [4,3,5,1,0,2],    // ob
+  oy : [4,5,1,0,3,2],    // br
+  yg : [5,1,4,3,2,0],    // yg
+  yr : [5,2,1,4,3,0],    // yr
+  yb : [5,3,2,1,4,0],    // yb
+  yo : [5,4,3,2,1,0]     // yo
+};
+
+</script>
+<style>
+body {
+  font-size:15px;
+  font-family:sans-serif;
+  background-color:lavender;
+}
+div {
+  position:absolute;
+  width:20px;
+  height:20px;
+  padding:0;
+  margin:0;
+}
+canvas {
+  position:relative;
+  left:10px;
+  top:200px;
+}
+#help {
+  width:67%;
+  margin-left:300px;
+}
+#help p {
+  padding:0;
+  margin:0;
+  text-align:left;
+  user-select:auto;
+}
+#info {
+  padding:0;
+  margin:0;
+  text-align:left;
+  user-select:auto;
+}
+p {
+  padding:0;
+  margin:0;
+  text-align:center;
+  user-select:none;
+}
+button[id^='0'] {
+  background-color:white;
+}
+button[id^='1'] {
+  background-color:green;
+}
+button[id^='2'] {
+  background-color:red;
+}
+button[id^='3'] {
+  background-color:blue;
+}
+button[id^='4'] {
+  background-color:orange;
+}
+button[id^='5'] {
+  background-color:yellow;
+}
+</style>
+</head>
+<body onload='initialize()'>
+<label for="title">Title</label>
+<input id="title" type="text"/>&nbsp;&nbsp;&nbsp;
+<label for="loadFile">Load from file:</label>
+<input type="file" accept=".rbk" id="loadFile" onChange="loadFiles(this)"/>&nbsp;&nbsp;
+<button type="button" id="save2window" onClick="save2popup(this)">SHOW AS TEXT</button>
+<div style='display:inline;padding-left:8em;'><button type="button" onClick="toggle('help')">HELP</button></div>
+<br>
+<p id="info">&nbsp;</p>  
+<hr>
+<!-- ids are <face>-<row>-<column> -->
+<button id='undoall'>UNDO ALL</button>
+<button id='redoall'>REDO ALL</button>
+<label for='setup' style='font-family:sans-serif;margin-left:100px;'>SETUP</label><input type='checkbox' id='setup'>
+  <button id='reset' style='margin-left:110px;' onclick='pw && pw.close(),location.reload()'>RESET</button>
+<br>
+<button id='undo'>UNDO</button>
+<button id='redo'>REDO</button>
+<br>
+<button id='0-3'>CC</button>
+<button id='0-2'>HW</button>
+<button id='0-1'>CW</button>
+<button id='5-3'>CC</button>
+<button id='5-2'>HW</button>
+<button id='5-1'>CW</button>
+<br>
+<button id='1-3'>CC</button>
+<button id='1-2'>HW</button>
+<button id='1-1'>CW</button>
+<button id='3-3'>CC</button>
+<button id='3-2'>HW</button>
+<button id='3-1'>CW</button>
+<br>
+<button id='2-3'>CC</button>
+<button id='2-2'>HW</button>
+<button id='2-1'>CW</button>
+<button id='4-3'>CC</button>
+<button id='4-2'>HW</button>
+<button id='4-1'>CW</button>
+<hr>
+<div>
+<div id="0-0-0"><p>&nbsp;</p></div><div id="0-0-1"><p>&nbsp;</p></div><div id="0-0-2"><p>&nbsp;</p></div>
+<div id="0-1-0"><p>&nbsp;</p></div><div id="0-1-1"><p>&#8593;</p></div><div id="0-1-2"><p>&nbsp;</p></div>
+<div id="0-2-0"><p>&nbsp;</p></div><div id="0-2-1"><p>&nbsp;</p></div><div id="0-2-2"><p>&nbsp;</p></div>
+<div id="1-0-0"><p>&nbsp;</p></div><div id="1-0-1"><p>&nbsp;</p></div><div id="1-0-2"><p>&nbsp;</p></div>
+<div id="1-1-0"><p>&nbsp;</p></div><div id="1-1-1"><p>&#8593;</p></div><div id="1-1-2"><p>&nbsp;</p></div>
+<div id="1-2-0"><p>&nbsp;</p></div><div id="1-2-1"><p>&nbsp;</p></div><div id="1-2-2"><p>&nbsp;</p></div>
+<div id="2-0-0"><p>&nbsp;</p></div><div id="2-0-1"><p>&nbsp;</p></div><div id="2-0-2"><p>&nbsp;</p></div>
+<div id="2-1-0"><p>&nbsp;</p></div><div id="2-1-1"><p>&#8593;</p></div><div id="2-1-2"><p>&nbsp;</p></div>
+<div id="2-2-0"><p>&nbsp;</p></div><div id="2-2-1"><p>&nbsp;</p></div><div id="2-2-2"><p>&nbsp;</p></div>
+<div id="3-0-0"><p>&nbsp;</p></div><div id="3-0-1"><p>&nbsp;</p></div><div id="3-0-2"><p>&nbsp;</p></div>
+<div id="3-1-0"><p>&nbsp;</p></div><div id="3-1-1"><p>&#8593;</p></div><div id="3-1-2"><p>&nbsp;</p></div>
+<div id="3-2-0"><p>&nbsp;</p></div><div id="3-2-1"><p>&nbsp;</p></div><div id="3-2-2"><p>&nbsp;</p></div>
+<div id="4-0-0"><p>&nbsp;</p></div><div id="4-0-1"><p>&nbsp;</p></div><div id="4-0-2"><p>&nbsp;</p></div>
+<div id="4-1-0"><p>&nbsp;</p></div><div id="4-1-1"><p>&#8593;</p></div><div id="4-1-2"><p>&nbsp;</p></div>
+<div id="4-2-0"><p>&nbsp;</p></div><div id="4-2-1"><p>&nbsp;</p></div><div id="4-2-2"><p>&nbsp;</p></div>
+<div id="5-0-0"><p>&nbsp;</p></div><div id="5-0-1"><p>&nbsp;</p></div><div id="5-0-2"><p>&nbsp;</p></div>
+<div id="5-1-0"><p>&nbsp;</p></div><div id="5-1-1"><p>&#8593;</p></div><div id="5-1-2"><p>&nbsp;</p></div>
+<div id="5-2-0"><p>&nbsp;</p></div><div id="5-2-1"><p>&nbsp;</p></div><div id="5-2-2"><p>&nbsp;</p></div>
+<div id="f0" class="face" style="left:200px;top:5px;"><p>&nbsp;</p></div><div id="f1" class="face" style="left:221px;top:5px;"><p>&nbsp;</p></div><div id="f2" class="face" style="left:200px;top:26px;"><p>&nbsp;</p></div>
+</div>
+<div style="left:0;top:0:"><canvas id="cube3d" width="192" height="192"></canvas></div>
+<p id='ot' style='display:none'>&#8593;&#8594;&#8595;&#8592;</p>
+<div id='help' style='display:none '>
+<p>The banner at the top shows a Title, a button to Load from file (type .rbk) a sequence of moves, and a button to pop up the running sequence of moves.</p>
+<p>The .rbk file format is a sequence of text lines. Lines come in two types:</p>
+<p>Type 1 is a whitespace-separated sequence of moves. A move is an optional signed decimal repeat count preceding a move name.</p>
+<p>A move name is either a case-insensitive face identifier (one of W G R B O Y) signifying a 90&deg; clockwise rotation, or a user-defined name.</p>
+<p>A move name can be optionally modified with an argument of the form (xx), where xx specifies one of 24 mappings of wr to abutting color pairs;</p>
+<p>for example, (yb) maps wgrboy to ybrgow. Arguments are case-insensitive.</p>
+<p>Type 2 is a user definition starting with a case-sensitive name, a colon, and a whitespace-separated sequence of moves.</p>
+<p>User-defined names must start with a letter or an underscore but otherwise can contain digits as well as letters and underscores.</p>
+<p>Lines can contain comments initiated by #.</p>
+<br>
+<p>Below the banner is a set of buttons for manipulating the Rubik's cube.</p>
+<table><tr><th colspan=2 style='text-align:left;padding-left:2em;'>Description of buttons</th></tr>
+<tr><td>UNDO ALL</td><td>undo all moves</td></tr>
+<tr><td>REDO ALL</td><td>redo all moves</td></tr>
+<tr><td>UNDO</td><td>undo the last move</td></tr>
+<tr><td>REDO</td><td>redo the move just undone</td></tr>
+<tr><td>CC</td><td>rotate the same-colored face 90&deg; counterclockwise</td></tr>
+<tr><td>HW</td><td>rotate the same-colored face 180&deg;</td></tr>
+<tr><td>CW</td><td>rotate the same-colored face 90&deg; clockwise</td></tr>
+<tr><td>SETUP</td><td>when checked, allows pairs of cubelets to be swapped by clicking on each in turn</td></tr>
+<tr><td>RESET</td><td>restore everything to its initial state</td></tr></table>
+<br>
+<p>Below the buttons is the Rubik's cube itself, with the faces unfolded. Clicking on a face center reorients the cube:</p>
+<p>If the selected face was already the central face, the cube is rotated 90&deg; clockwise.</p>
+<p>Otherwise the selected face becomes the central face with unchanged 2D orientation.</p>
+<p>The arrow on each face center shows the center's rotation relative to its initial orientation. An uparrow means unrotated.</p>
+</div>
+</body>
+</html>
