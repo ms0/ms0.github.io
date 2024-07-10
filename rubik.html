@@ -352,20 +352,26 @@ var SIN30 = 1/2;
 var offsets = [
   [CUBESIZE+CUBEMARGIN,CUBEMARGIN],
   [CUBEMARGIN,CUBESIZE+CUBEMARGIN],
-  [CUBESIZE+CUBEMARGIN,CUBESIZE+CUBEMARGIN]
+  [CUBESIZE+CUBEMARGIN,CUBESIZE+CUBEMARGIN],
+  [2*CUBESIZE+CUBEMARGIN,CUBESIZE+CUBEMARGIN],
+  [3*CUBESIZE+CUBEMARGIN,CUBESIZE+CUBEMARGIN],
+  [CUBESIZE+CUBEMARGIN,2*CUBESIZE+CUBEMARGIN]
 ];
 var transforms = [
   [COS30,SIN30-1,COS30,SIN30,-COS30*CUBESIZE+HEXSIZE/2,-SIN30*CUBESIZE+HEXSIZE/2],
   [COS30,SIN30,0,1,-COS30*CUBESIZE+HEXSIZE/2,-SIN30*CUBESIZE+HEXSIZE/2],
-  [COS30,-SIN30,0,1,HEXSIZE/2,HEXSIZE/2]
+  [COS30,-SIN30,0,1,HEXSIZE/2,HEXSIZE/2],
+  [COS30,-SIN30,0,1,-COS30*CUBESIZE+HEXSIZE/2,HEXSIZE],
+  [COS30,SIN30,0,1,HEXSIZE/2,-SIN30*CUBESIZE+HEXSIZE],
+  [-COS30,-SIN30,COS30,SIN30-1,HEXSIZE/2,(1+SIN30)*CUBESIZE+HEXSIZE]
 ];
 
 function show3d() {    // update 3d picture from relevant faces
   var f,r,c,o;
   var x,y;
   var fp;
-  ctx.clearRect(0,0,HEXSIZE,HEXSIZE);
-  for (f=0;f<3;f++) {
+  ctx.clearRect(0,0,HEXSIZE,2*HEXSIZE);
+  for (f=0;f<6;f++) {
     ctx.setTransform(...transforms[f]);
     fp = pos2face[f];
     for (r=0;r<3;r++) {
@@ -978,13 +984,13 @@ button[id^='5'] {
 <div id="5-2-0"><p>&nbsp;</p></div><div id="5-2-1"><p>&nbsp;</p></div><div id="5-2-2"><p>&nbsp;</p></div>
 <div id="f0" class="face" style="left:200px;top:5px;"><p>&nbsp;</p></div><div id="f1" class="face" style="left:221px;top:5px;"><p>&nbsp;</p></div><div id="f2" class="face" style="left:200px;top:26px;"><p>&nbsp;</p></div>
 </div>
-<div style="left:0;top:0:"><canvas id="cube3d" width="192" height="192"></canvas></div>
+<div style="left:0;top:0:"><canvas id="cube3d" width="192" height="384"></canvas></div>
 <p id='ot' style='display:none'>&#8593;&#8594;&#8595;&#8592;</p>
 <div id='help' style='display:none '>
 <p>The banner at the top shows a Title, a button to Load from file (type .rbk) a sequence of moves, and a button to pop up the running sequence of moves.</p>
 <p>The .rbk file format is a sequence of text lines. Lines come in two types:</p>
 <p>Type 1 is a whitespace-separated sequence of moves. A move is an optional signed decimal repeat count preceding a move name.</p>
-<p>A move name is either a case-insensitive face identifier (one of W G R B O Y) signifying a 90&deg; clockwise rotation, or a user-defined name.</p>
+<p>A move name is either a case-insensitive face identifier (one of w g r b o y) signifying a 90&deg; clockwise rotation, or a user-defined name.</p>
 <p>A move name can be optionally modified with an argument of the form (xx), where xx specifies one of 24 mappings of wr to abutting color pairs;</p>
 <p>for example, (yb) maps wgrboy to ybrgow. Arguments are case-insensitive.</p>
 <p>Type 2 is a user definition starting with a case-sensitive name, a colon, and a whitespace-separated sequence of moves.</p>
@@ -1003,10 +1009,12 @@ button[id^='5'] {
 <tr><td>SETUP</td><td>when checked, allows pairs of cubelets to be swapped by clicking on each in turn</td></tr>
 <tr><td>RESET</td><td>restore everything to its initial state</td></tr></table>
 <br>
-<p>Below the buttons is the Rubik's cube itself, with the faces unfolded. Clicking on a face center reorients the cube:</p>
-<p>If the selected face was already the central face, the cube is rotated 90&deg; clockwise.</p>
-<p>Otherwise the selected face becomes the central face with unchanged 2D orientation.</p>
-<p>The arrow on each face center shows the center's rotation relative to its initial orientation. An uparrow means unrotated.</p>
+<p>Below the buttons is the Rubik&rsquo;s cube itself, with its faces unfolded. Clicking on a face&rsquo;s center square reorients the cube:</p>
+<p>If the face was already in the central position, the cube is rotated 90&deg; clockwise; otherwise, the face is slid unrotated to the central position.</p>
+<p>The arrow on each face&rsquo;s center square shows the face&rsquo;s rotation relative to its initial orientation. An uparrow means unrotated.</p>
+<p>Clicking on a face&rsquo;s edge square rotates the face so the arrow points to that edge.</p>
+<hr>
+<p>Below the unfolded cube is a pair of 3D pictures of the cube together showing all 6 faces.<p>
 </div>
 </body>
 </html>
