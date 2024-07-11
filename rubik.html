@@ -156,7 +156,8 @@ var faces = [];    // cubelet shown in setup
 
 var no3d = 0;         // set to disable show3d
 var ctx;              // canvas for 3d representation
-var HEXSIZE = 192;    // size of 3d canvas
+var HEXW = 192;       // width of 3d canvas
+var HEXH = 288;       // height of 3d canvas
 
 var savestack = [];
 
@@ -349,28 +350,29 @@ function posefaces() {
 
 var COS30 = Math.sqrt(3)/2;
 var SIN30 = 1/2;
+var HCUBEX = (CUBESIZE-CUBELETGAP)/2;
 var offsets = [
-  [CUBESIZE+CUBEMARGIN,CUBEMARGIN],
-  [CUBEMARGIN,CUBESIZE+CUBEMARGIN],
-  [CUBESIZE+CUBEMARGIN,CUBESIZE+CUBEMARGIN],
-  [2*CUBESIZE+CUBEMARGIN,CUBESIZE+CUBEMARGIN],
-  [3*CUBESIZE+CUBEMARGIN,CUBESIZE+CUBEMARGIN],
-  [CUBESIZE+CUBEMARGIN,2*CUBESIZE+CUBEMARGIN]
+  [CUBEMARGIN+CUBESIZE+HCUBEX,CUBEMARGIN+HCUBEX],
+  [CUBEMARGIN+HCUBEX,CUBEMARGIN+CUBESIZE+HCUBEX],
+  [CUBEMARGIN+CUBESIZE+HCUBEX,CUBEMARGIN+CUBESIZE+HCUBEX],
+  [CUBEMARGIN+2*CUBESIZE+HCUBEX,CUBEMARGIN+CUBESIZE+HCUBEX],
+  [CUBEMARGIN+3*CUBESIZE+HCUBEX,CUBEMARGIN+CUBESIZE+HCUBEX],
+  [CUBEMARGIN+CUBESIZE+HCUBEX,CUBEMARGIN+2*CUBESIZE+HCUBEX]
 ];
 var transforms = [
-  [COS30,SIN30-1,COS30,SIN30,-COS30*CUBESIZE+HEXSIZE/2,-SIN30*CUBESIZE+HEXSIZE/2],
-  [COS30,SIN30,0,1,-COS30*CUBESIZE+HEXSIZE/2,-SIN30*CUBESIZE+HEXSIZE/2],
-  [COS30,-SIN30,0,1,HEXSIZE/2,HEXSIZE/2],
-  [COS30,-SIN30,0,1,-COS30*CUBESIZE+HEXSIZE/2,HEXSIZE],
-  [COS30,SIN30,0,1,HEXSIZE/2,-SIN30*CUBESIZE+HEXSIZE],
-  [-COS30,-SIN30,COS30,SIN30-1,HEXSIZE/2,(1+SIN30)*CUBESIZE+HEXSIZE]
+  [COS30,SIN30-1,COS30,SIN30,HEXW/2,-2*HCUBEX+HEXH/3],
+  [COS30,SIN30,0,1,-HCUBEX*COS30+HEXW/2,-HCUBEX*SIN30+HEXH/3],
+  [COS30,-SIN30,0,1,HCUBEX*COS30+HEXW/2,-HCUBEX*SIN30+HEXH/3],
+  [COS30,-SIN30,0,1,-HCUBEX*COS30+HEXW/2,HCUBEX*SIN30+2*HEXH/3],
+  [COS30,SIN30,0,1,HCUBEX*COS30+HEXW/2,HCUBEX*SIN30+2*HEXH/3],
+  [-COS30,-SIN30,COS30,SIN30-1,HEXW/2,2*HCUBEX+2*HEXH/3]
 ];
 
 function show3d() {    // update 3d picture from relevant faces
   var f,r,c,o;
   var x,y;
   var fp;
-  ctx.clearRect(0,0,HEXSIZE,2*HEXSIZE);
+  ctx.clearRect(0,0,HEXW,HEXH);
   for (f=0;f<6;f++) {
     ctx.setTransform(...transforms[f]);
     fp = pos2face[f];
@@ -879,7 +881,7 @@ div {
 canvas {
   position:relative;
   left:10px;
-  top:200px;
+  top:224px;
 }
 #help {
   width:67%;
@@ -984,7 +986,7 @@ button[id^='5'] {
 <div id="5-2-0"><p>&nbsp;</p></div><div id="5-2-1"><p>&nbsp;</p></div><div id="5-2-2"><p>&nbsp;</p></div>
 <div id="f0" class="face" style="left:200px;top:5px;"><p>&nbsp;</p></div><div id="f1" class="face" style="left:221px;top:5px;"><p>&nbsp;</p></div><div id="f2" class="face" style="left:200px;top:26px;"><p>&nbsp;</p></div>
 </div>
-<div style="left:0;top:0:"><canvas id="cube3d" width="192" height="384"></canvas></div>
+<div style="left:0;top:0:"><canvas id="cube3d" width="192" height="288"></canvas></div>
 <p id='ot' style='display:none'>&#8593;&#8594;&#8595;&#8592;</p>
 <div id='help' style='display:none '>
 <p>The banner at the top shows a Title, a button to Load from file (type .rbk) a sequence of moves, and a button to pop up the running sequence of moves.</p>
