@@ -102,8 +102,9 @@ var currentmap;   // current map for functions
 
 var cnum = {};    // color -> number (derived from facecolors)
 
-var moves = [];    // list of moves
-var mp = 0;    // moves position
+var moves;     // list of moves
+var mp;        // moves position
+var marks;     // marks
 
 var cwbes = ['-0-0','-0-1','-0-2','-1-2','-2-2','-2-1','-2-0','-1-0'];
 
@@ -417,7 +418,9 @@ function initialize() {
   cinit();
   posefaces();
   uinit();
+  moves = [];
   mp = 0;
+  marks = [];
   moves.length = 0;
   pw && save2popup();
   o = document.getElementById('undoall');
@@ -717,8 +720,13 @@ function save2popup(o) {
   var s = d.body.scrollTop;
   var x = '<html><head><title>'+title+'</title><style>p{font-family:"Lucida Console";font-size:9pt;text-align:left;line-height:9pt;margin:0;}hr{padding:0px;margin:0px;}</style></head><body>';
   var i;
+  var j=0;
   for (i=0; i<=moves.length; i++) {
     if (i==mp) x += '<hr>';
+    if (j < marks.length && marks[j]==i) {
+      x += '<hr style="#eeeeee;">';
+      j++;
+    }
     if (i == moves.length) {
       while (i-- > mp) x += '<p>Undo</p>';
       break;
@@ -958,13 +966,15 @@ canvas {
   user-select:auto;
 }
 #info {
+  display:inline;
+  float:right;
   padding:0;
   margin:0;
-  text-align:left;
+  text-align:right;
   user-select:auto;
 }
 #buttons {
-  height:100px;
+  height:85px;
 }
 #movebuttons {
   margin-top:9px;
@@ -979,9 +989,8 @@ canvas {
   width:2em;
 }
 #fcns {
-  margin-top:-10px;
-  margin-left:10px;
-  margin-bottom:0;
+  padding:0;
+  margin:-10px 0 0 10px;
   padding-inline-start:0;
   height:100px;
   float:left;
@@ -1030,13 +1039,12 @@ button[id^='5'] {
 <input type="file" accept=".rbk" id="loadFile" onChange="loadFiles(this)"/>&nbsp;&nbsp;
 <button type="button" id="save2window" onClick="save2popup(this)">SHOW AS TEXT</button>
 <div style='display:inline;padding-left:8em;'><button type="button" onClick="toggle('help')">HELP</button></div>
-<br>
-<p id="info">&nbsp;</p>  
 <hr>
 <button id='undoall'>UNDO ALL</button>
 <button id='redoall'>REDO ALL</button>
 <label for='setup' style='font-family:sans-serif;margin-left:100px;'>SETUP</label><input type='checkbox' id='setup'>
   <button id='reset' style='margin-left:110px;' onclick='pw && pw.close(),location.reload()'>RESET</button>
+<p id="info">&nbsp;</p>  
 <br>
 <button id='undo'>UNDO</button>
 <button id='redo'>REDO</button>
