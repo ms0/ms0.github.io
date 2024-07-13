@@ -3,12 +3,6 @@
 <head>
 <title>Rubik's Cube</title>
 <script>
-/* questions:
-   how do we specify the colors of the faces of each cube ?
-   how do we tell which cube face is on a particular rubik face ?
-   how do we show the orientation of the center cube on each face ? >^<v
-*/
-
 var pw=0;    // popup window
 
 /****************************************************************
@@ -33,21 +27,18 @@ There are 54 facelets. Keeping track of the facelet colors (and face center orie
 
 Colors and center orientation are transformed according to which face is being rotated and by how much. 
 
-What datastructure do we need?
-  An array to keep track of move history. Note that backing up is very easy, as each move is trivially reversible.
+moves: An array to keep track of move history. Note that backing up is very easy, as each move is trivially reversible.
 
-  For each cube, its state.
-  OR, for each position, its contents and state.
-  How do we represent a cube's state? If we consider its natural orientation, then we can just specify its rotation from that orientation. There are 24 orientations (8 corners * 3 rotations about corner, or 6 faces * 4 plane rotations, 12 edges * 2 flips)
+How do we represent a cube's state? If we consider its natural orientation, then we can just specify its rotation from that orientation. There are 24 orientations (8 corners * 3 rotations about corner, or 6 faces * 4 plane rotations, 12 edges * 2 flips)
 
-  If we use coordinates for the cubes, we can use normal 3-d transformations...
+If we use coordinates for the cubes, we can use normal 3-d transformations...
 center cubes at x,y,z such that two are 0 and one is +-1; corner cubes such that each of the three are +-1; edge cubes such that one is 0 and the two others are +-1. And the same 3d transforms indicate the orientation of the cubes. We apply the transform to a single face.
 
-What routines do we need?
+Routines:
   A routine to perform a move (and save the move)
-  A routine to display the rubik cube in its current state
-  A routine to perform a programmed sequence of moves
-  A routine to invert a sequence of moves
+  A routine to display the rubik cube in its current state (show3d)
+  A routine to perform a programmed sequence of moves (expand)
+  A routine to invert a sequence of moves (undo, undoall)
 UI: Center cubelet has arrow indicating its cumulative rotation, initially an uparrow. Clicking an edge cubelet on a face rotates that face so that arrow points to that cubelet.
   Clicking on center cubelet of any face makes that face the "center" of the display. This requires repositioning each cubelet. We leave the arrows unchanged, so that an uparrow always indicates that the center cubelet is in its initial orientation. If we click on the center face, we rotate the entire cube clockwise about that face, again leaving the arrows unchanged.
   Need mapping from face-row-column to x,y: face->(x,y) offset, and for each face, r,c -> (x,y) offset (with original positioning, r,c translates to top, left, respectively), but that is no longer true with a different face at center. It's simpler if we keep G,R,B,O orientation unchanged when we make them the central face, leaving just W and Y to rotate. But if we allow not only which face is the center, but it's orientation, then there are 24 possible configurations.
@@ -104,6 +95,10 @@ The arrows shown on the center of each face do not rotate for different unfoldin
 they show the state of rotation of the face centers relative to their initial state (^).
 
 ****************************************************************/
+
+var movedict = {w:0,g:1,r:2,b:3,o:4,y:5,W:0,G:1,R:2,B:3,O:4,Y:5};
+
+var currentmap;   // current map for functions
 
 var cnum = {};    // color -> number (derived from facecolors)
 
@@ -162,6 +157,8 @@ var HEXH = 288;       // height of 3d canvas
 var savestack = [];
 
 function savemovestate() {
+  savestack.push(pw);
+  pw = 0;
   savestack.push(moves.slice(mp));
   moves.length = mp;
 }
@@ -169,6 +166,8 @@ function savemovestate() {
 function restoremovestate() {
   moves.length = mp;
   moves.push(...savestack.pop());
+  pw = savestack.pop();
+  pw && save2popup();
 }
 
 function classes(c) {
@@ -286,7 +285,25 @@ function uinit() {    // initialize UI (click listeners)
   }
   o = classes('face');
   for (c in o) o[c].style.backgroundColor = 'transparent';
+  o = document.getElementById('pushbuttons');
+  o.childNodes.forEach(function(o) {
+    if (o.nodeType == 1) {
+      o.style.backgroundColor='transparent';
+      o.addEventListener('click',selectmap);
+    }
+  });
+  o.firstElementChild.style.backgroundColor='white';
+  currentmap = 'WG';
 }
+
+function selectmap(event) {
+  var t = event.target;
+  t.parentNode.childNodes.forEach(function(o) {
+    if (o.nodeType == 1) o.style.backgroundColor='transparent';
+  });
+  t.style.backgroundColor='white';
+  currentmap = t.innerHTML;
+}  
 
 function rotate(event) {
   // rotate clicked-on face by updating outside colors and center orientation symbol
@@ -402,6 +419,7 @@ function initialize() {
   uinit();
   mp = 0;
   moves.length = 0;
+  pw && save2popup();
   o = document.getElementById('undoall');
   o.disabled = true;
   o.addEventListener('click',undoall);
@@ -725,6 +743,28 @@ function save2popup(o) {
   },1);
 }
 
+function addfcn(name,value) {
+  var o = document.getElementById('fcns');
+  o.childNodes.forEach(function(n) {
+    if (n.nodeType == 1) {
+      var s = n.innerHTML;
+      var c = s.search(':');
+      if (name == s.slice(0,c)) n.remove();
+    }
+  });
+  var n = document.createElement('li');
+  var t = document.createTextNode(name+': '+value);
+  n.appendChild(t);
+  o.appendChild(n);
+  n.addEventListener('click',execfcn);
+}
+
+function execfcn(event) {
+  var s=event.target.innerHTML;
+  var c=s.search(':');
+  dostring('x('+currentmap+')',{x:expand(s.slice(c+1).trim(),movedict)});
+}		   
+
 function loadFiles(o) {
   var files = o.files;
   var i;
@@ -742,12 +782,18 @@ function loadFiles(o) {
   o.value = '';
 }
 
-// this needs to be customized for rubik :
-
 function loadFile(f,o,s) {
+  var k;
   document.getElementById('title').value = f.name.replace(/\.\w*$/,'');
   initialize();
-  var dict = {w:0,g:1,r:2,b:3,o:4,y:5,W:0,G:1,R:2,B:3,O:4,Y:5};
+  var dict = dostring(s,Object.create(movedict));
+  for (k in dict) {
+    if (!(k.toLowerCase() in movedict)) addfcn(k,moves2string(dict[k]));
+  }
+}
+
+function dostring(s,dict) {
+  moves = moves.slice(0,mp);
   var op;
   var i;
   var c;
@@ -761,7 +807,6 @@ function loadFile(f,o,s) {
     c = line.search(':');    
     if (c<0) {    // regular commands
       moves.push(...expand(line,dict));
-      mp = 0;
     } else {      // definition
       op = line.slice(0,c).trim();
       if (/^[A-Za-z_]\w*$/.test(op))
@@ -769,6 +814,7 @@ function loadFile(f,o,s) {
     }
   }
   redoall();
+  return dict;
 }
 
 function expand(s,d) {
@@ -783,6 +829,7 @@ function expand(s,d) {
   var i;
   var j;
   var k;    // repeat count
+  var c = 0;    // count of tokens
   var info = document.getElementById('info');
   if (s) {
     s = s.split(/\s+/);
@@ -791,13 +838,17 @@ function expand(s,d) {
       k = +(/^[+-]?$/.test(t) ? t+'1' : t); 
       if (k) {
 	t = s[i].slice(t.length);
-	u = /^[A-Za-z_]\w*/.exec(t)[0];
+	u = /^[A-Za-z_]\w*/.exec(t);
+	if (!u) break;
+	u = u[0];
 	t = t.slice(u.length).toLowerCase();    // is there a transformation?
 	m = (/^\([wgrboy]{2}\)$/.test(t) ? pdict[t.slice(1,3)] : null) || pdict['wg'];
 	op = d[u];
 	if (typeof(op) == typeof(0)) {
+	  c++;
 	  moves.push((m[op]<<2)|(k&3));
 	} else if (op) {
+	  c++;
 	  if (k<0) {
 	    while (k++) {
 	      for (j=op.length; j--;) {
@@ -814,17 +865,21 @@ function expand(s,d) {
       }
     }
   }
-  t = [];
-  if (moves.length > 1) {
-    for (i in moves) {
-      op = moves[i];
-      t.push((op&3)+'WGRBOY'[op>>2]);
-    }
-    t.push(getorder(moves,true));
-    t.push(getorder(moves));
-    info.innerHTML = t.join(' ');
-  }
+  if (c > 1) info.innerHTML = moves2string(moves);
   return moves;
+}
+
+function moves2string(moves) {
+  var t = [];
+  var i;
+  for (i in moves) {
+    op = moves[i];
+    t.push((op&3)+'WGRBOY'[op>>2]);
+  }
+  t.push(' # ');
+  t.push(getorder(moves,true));
+  t.push(getorder(moves));
+  return t.join(' ');
 }
 
 function mop(m,op) {
@@ -871,12 +926,20 @@ body {
   font-family:sans-serif;
   background-color:lavender;
 }
-div {
+#cubelets {
+  position:absolute;
+  z-index:1;
+}
+#cubelets div {
   position:absolute;
   width:20px;
   height:20px;
   padding:0;
   margin:0;
+}
+#canvasdiv {
+  position:absolute;
+  left:0;top:0:
 }
 canvas {
   position:relative;
@@ -884,6 +947,7 @@ canvas {
   top:224px;
 }
 #help {
+  position:static;
   width:67%;
   margin-left:300px;
 }
@@ -899,6 +963,40 @@ canvas {
   text-align:left;
   user-select:auto;
 }
+#buttons {
+  height:100px;
+}
+#movebuttons {
+  margin-top:9px;
+  float:left;
+}
+#pushbuttons {
+  margin-left:10px;
+  float:left;
+}
+#pushbuttons button {
+  padding:0;
+  width:2em;
+}
+#fcns {
+  margin-top:-10px;
+  margin-left:10px;
+  margin-bottom:0;
+  padding-inline-start:0;
+  height:100px;
+  float:left;
+  overflow:hidden;
+  overflow-y:scroll;
+  list-style:none;
+}
+#fcns li {
+  cursor:context-menu;
+}
+
+#fcns li:hover {
+  background-color:white;
+}
+
 p {
   padding:0;
   margin:0;
@@ -935,7 +1033,6 @@ button[id^='5'] {
 <br>
 <p id="info">&nbsp;</p>  
 <hr>
-<!-- ids are <face>-<row>-<column> -->
 <button id='undoall'>UNDO ALL</button>
 <button id='redoall'>REDO ALL</button>
 <label for='setup' style='font-family:sans-serif;margin-left:100px;'>SETUP</label><input type='checkbox' id='setup'>
@@ -944,6 +1041,8 @@ button[id^='5'] {
 <button id='undo'>UNDO</button>
 <button id='redo'>REDO</button>
 <br>
+<div id='buttons'>
+<div id='movebuttons'>
 <button id='0-3'>CC</button>
 <button id='0-2'>HW</button>
 <button id='0-1'>CW</button>
@@ -964,8 +1063,41 @@ button[id^='5'] {
 <button id='4-3'>CC</button>
 <button id='4-2'>HW</button>
 <button id='4-1'>CW</button>
+</div>
+<div id='pushbuttons'>
+<button id='WG'>WG</button>
+<button id='GW'>GW</button>
+<button id='RW'>RW</button>
+<button id='BW'>BW</button>
+<button id='OW'>OW</button>
+<button id='YR'>YR</button>
+<br>
+<button id='WR'>WR</button>
+<button id='GR'>GR</button>
+<button id='RG'>RG</button>
+<button id='BR'>BR</button>
+<button id='OG'>OG</button>
+<button id='YG'>YG</button>
+<br>
+<button id='WB'>WB</button>
+<button id='GO'>GO</button>
+<button id='RB'>RB</button>
+<button id='BO'>BO</button>
+<button id='OB'>OB</button>
+<button id='YB'>YB</button>
+<br>
+<button id='WO'>WO</button>
+<button id='GY'>GY</button>
+<button id='RY'>RY</button>
+<button id='BY'>BY</button>
+<button id='OY'>OY</button>
+<button id='YO'>YO</button>
+</div>
+<ul id='fcns'>
+</div>
 <hr>
-<div>
+<div id='cubelets'>
+<!-- ids are <face>-<row>-<column> -->
 <div id="0-0-0"><p>&nbsp;</p></div><div id="0-0-1"><p>&nbsp;</p></div><div id="0-0-2"><p>&nbsp;</p></div>
 <div id="0-1-0"><p>&nbsp;</p></div><div id="0-1-1"><p>&#8593;</p></div><div id="0-1-2"><p>&nbsp;</p></div>
 <div id="0-2-0"><p>&nbsp;</p></div><div id="0-2-1"><p>&nbsp;</p></div><div id="0-2-2"><p>&nbsp;</p></div>
@@ -986,36 +1118,38 @@ button[id^='5'] {
 <div id="5-2-0"><p>&nbsp;</p></div><div id="5-2-1"><p>&nbsp;</p></div><div id="5-2-2"><p>&nbsp;</p></div>
 <div id="f0" class="face" style="left:200px;top:5px;"><p>&nbsp;</p></div><div id="f1" class="face" style="left:221px;top:5px;"><p>&nbsp;</p></div><div id="f2" class="face" style="left:200px;top:26px;"><p>&nbsp;</p></div>
 </div>
-<div style="left:0;top:0:"><canvas id="cube3d" width="192" height="288"></canvas></div>
+<div id='canvasdiv'><canvas id="cube3d" width="192" height="288"></canvas></div>
 <p id='ot' style='display:none'>&#8593;&#8594;&#8595;&#8592;</p>
 <div id='help' style='display:none '>
 <p>The banner at the top shows a Title, a button to Load from file (type .rbk) a sequence of moves, and a button to pop up the running sequence of moves.</p>
 <p>The .rbk file format is a sequence of text lines. Lines come in two types:</p>
 <p>Type 1 is a whitespace-separated sequence of moves. A move is an optional signed decimal repeat count preceding a move name.</p>
 <p>A move name is either a case-insensitive face identifier (one of w g r b o y) signifying a 90&deg; clockwise rotation, or a user-defined name.</p>
-<p>A move name can be optionally modified with an argument of the form (xx), where xx specifies one of 24 mappings of wr to abutting color pairs;</p>
+<p>A move name can be optionally modified with an argument of the form (xx), where xx specifies one of 24 mappings of wg to abutting color pairs;</p>
 <p>for example, (yb) maps wgrboy to ybrgow. Arguments are case-insensitive.</p>
 <p>Type 2 is a user definition starting with a case-sensitive name, a colon, and a whitespace-separated sequence of moves.</p>
 <p>User-defined names must start with a letter or an underscore but otherwise can contain digits as well as letters and underscores.</p>
-<p>Lines can contain comments initiated by #.</p>
-<br>
+<p>Lines can contain comments initiated by #. Generated comments give the repeat counts resulting in a no-op, ignoring center cubelet orientations or not.</p>
+<hr>
 <p>Below the banner is a set of buttons for manipulating the Rubik's cube.</p>
-<table><tr><th colspan=2 style='text-align:left;padding-left:2em;'>Description of buttons</th></tr>
-<tr><td>UNDO ALL</td><td>undo all moves</td></tr>
-<tr><td>REDO ALL</td><td>redo all moves</td></tr>
-<tr><td>UNDO</td><td>undo the last move</td></tr>
-<tr><td>REDO</td><td>redo the move just undone</td></tr>
-<tr><td>CC</td><td>rotate the same-colored face 90&deg; counterclockwise</td></tr>
-<tr><td>HW</td><td>rotate the same-colored face 180&deg;</td></tr>
-<tr><td>CW</td><td>rotate the same-colored face 90&deg; clockwise</td></tr>
-<tr><td>SETUP</td><td>when checked, allows pairs of cubelets to be swapped by clicking on each in turn</td></tr>
-<tr><td>RESET</td><td>restore everything to its initial state</td></tr></table>
-<br>
+<table>
+<tr><td></td><td>UNDO ALL</td><td>undo all moves</td></tr>
+<tr><td></td><td>REDO ALL</td><td>redo all moves</td></tr>
+<tr><td></td><td>UNDO</td><td>undo the last move</td></tr>
+<tr><td></td><td>REDO</td><td>redo the move just undone</td></tr>
+<tr><td></td><td>CC</td><td>rotate the same-colored face 90&deg; counterclockwise</td></tr>
+<tr><td></td><td>HW</td><td>rotate the same-colored face 180&deg;</td></tr>
+<tr><td></td><td>CW</td><td>rotate the same-colored face 90&deg; clockwise</td></tr>
+<tr><td></td><td>SETUP</td><td>when checked, allows pairs of cubelet faces to be swapped by clicking on each in turn, reorienting the 3D cubelet(s)</td></tr>
+<tr><td></td><td>RESET</td><td>restore everything to its initial state</td></tr></table>
+<p>To the right of the colored buttons is an array of buttons to select one of the 24 mappings, followed by a list of named move sequences culled from Load from file.</p>
+<p>Clicking on any of those sequences executes the sequence using the selected mapping.</p>
+<hr>
 <p>Below the buttons is the Rubik&rsquo;s cube itself, with its faces unfolded. Clicking on a face&rsquo;s center square reorients the cube:</p>
 <p>If the face was already in the central position, the cube is rotated 90&deg; clockwise; otherwise, the face is slid unrotated to the central position.</p>
 <p>The arrow on each face&rsquo;s center square shows the face&rsquo;s rotation relative to its initial orientation. An uparrow means unrotated.</p>
 <p>Clicking on a face&rsquo;s edge square rotates the face so the arrow points to that edge.</p>
-<hr>
+<br>
 <p>Below the unfolded cube is a pair of 3D pictures of the cube together showing all 6 faces.<p>
 </div>
 </body>
