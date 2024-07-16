@@ -429,6 +429,12 @@ function initialize() {
   o = document.getElementById('redoall');
   o.disabled = true;
   o.addEventListener('click',redoall);
+  o = document.getElementById('undomark');
+  o.disabled = true;
+  o.addEventListener('click',undo2mark);
+  o = document.getElementById('redomark');
+  o.disabled = true;
+  o.addEventListener('click',redo2mark);
   o = document.getElementById('undo');
   o.disabled = true;
   o.addEventListener('click', undo);
@@ -612,13 +618,22 @@ function rotface(op) {    // do the actual rotation
   orient[op>>2].textContent = ot[(ot.search(orient[op>>2].textContent)+op)&3];
 }
 
+function truncatelog() {
+  var i;
+  for (i=0; i<marks.length; i++) if (marks[i] > mp) break;
+  marks.length = i;
+  moves.length = mp;
+}
+
 function dodo(face,rot) { // rotate clockwise pi/2 * 0,1,2,3 mod 4
   rotface(moves[mp++] = face*4+rot%4);
-  moves.length = mp;
+  truncatelog();
   document.getElementById('undo').disabled = false;
   document.getElementById('undoall').disabled = false;
+  document.getElementById('undomark').disabled = false;
   document.getElementById('redo').disabled = true;
   document.getElementById('redoall').disabled = true;
+  document.getElementById('redomark').disabled = true;
   no3d || show3d();
   pw && save2popup();
 }
@@ -639,8 +654,10 @@ function undo(event) {
   if (mp) rotface(revrot(moves[--mp]))
   document.getElementById('redo').disabled = false;
   document.getElementById('redoall').disabled = false;
+  document.getElementById('redomark').disabled = false;
   document.getElementById('undo').disabled = !mp;
   document.getElementById('undoall').disabled = !mp;
+  document.getElementById('undomark').disabled = !mp;
   no3d || show3d();
   pw && save2popup();
 }
@@ -650,9 +667,11 @@ function redo(event) {
     rotface(moves[mp++]);
     document.getElementById('undo').disabled = false;
     document.getElementById('undoall').disabled = false;
+    document.getElementById('undomark').disabled = false;
     if (mp >= moves.length) {
       document.getElementById('redo').disabled = true;
       document.getElementById('redoall').disabled = true;
+      document.getElementById('redomark').disabled = true;
     }
   }
   no3d || show3d();
@@ -724,7 +743,7 @@ function save2popup(o) {
   for (i=0; i<=moves.length; i++) {
     if (i==mp) x += '<hr>';
     if (j < marks.length && marks[j]==i) {
-      x += '<hr style="#eeeeee;">';
+      x += '<hr style="color:#eeeeee;">';
       j++;
     }
     if (i == moves.length) {
@@ -751,6 +770,49 @@ function save2popup(o) {
   },1);
 }
 
+function mark(o) {    // return true if already marked, else mark and return false
+  var i;
+  for (i=marks.length; i--; ) {
+    if (marks[i] > mp) continue;
+    if (marks[i] == mp) return true;
+    break;
+  }
+  marks.splice(i+1,0,mp);
+  pw || save2popup();
+  return false;
+}
+
+function marked(x) {
+  var i;
+  for (i=marks.length;i--;) if (marks[i] <= x) return marks[i]==x;
+}
+
+function prevmark() {
+  var i;
+  for (i=marks.length;i--;) if (marks[i] < mp) return marks[i];
+  return 0;
+}
+
+function nextmark() {
+  var i;
+  for (i=0; i<marks.length; i++) if (marks[i] > mp) return marks[i];
+  return moves.length;
+}
+
+function undo2mark(event) {
+  var p = prevmark();
+  while (mp > p) {
+    undo();
+  }
+}
+
+function redo2mark(event) {
+  var x = nextmark();
+  while (mp < x) {
+    redo();
+  }
+}
+
 function addfcn(name,value) {
   var o = document.getElementById('fcns');
   o.childNodes.forEach(function(n) {
@@ -770,7 +832,9 @@ function addfcn(name,value) {
 function execfcn(event) {
   var s=event.target.innerHTML;
   var c=s.search(':');
+  mark();
   dostring('x('+currentmap+')',{x:expand(s.slice(c+1).trim(),movedict)});
+  mark();
 }		   
 
 function loadFiles(o) {
@@ -801,7 +865,7 @@ function loadFile(f,o,s) {
 }
 
 function dostring(s,dict) {
-  moves = moves.slice(0,mp);
+  truncatelog();
   var op;
   var i;
   var c;
@@ -955,6 +1019,7 @@ canvas {
   top:224px;
 }
 #help {
+  font-size:10pt;
   position:static;
   width:67%;
   margin-left:300px;
@@ -980,7 +1045,11 @@ canvas {
   margin-top:9px;
   float:left;
 }
+#undomark {
+  margin-left:100px;  
+}
 #pushbuttons {
+  margin-top:5px;
   margin-left:10px;
   float:left;
 }
@@ -1048,6 +1117,8 @@ button[id^='5'] {
 <br>
 <button id='undo'>UNDO</button>
 <button id='redo'>REDO</button>
+<button id='undomark'>UNDO GROUP</button>
+<button id='redomark'>REDO GROUP</button>
 <br>
 <div id='buttons'>
 <div id='movebuttons'>
@@ -1145,6 +1216,8 @@ button[id^='5'] {
 <tr><td></td><td>REDO ALL</td><td>redo all moves</td></tr>
 <tr><td></td><td>UNDO</td><td>undo the last move</td></tr>
 <tr><td></td><td>REDO</td><td>redo the move just undone</td></tr>
+<tr><td></td><td>UNDO GROUP</td><td>undo the last group of moves</td></tr>
+<tr><td></td><td>REDO GROUP</td><td>redo the next group of moves</td></tr>
 <tr><td></td><td>CC</td><td>rotate the same-colored face 90&deg; counterclockwise</td></tr>
 <tr><td></td><td>HW</td><td>rotate the same-colored face 180&deg;</td></tr>
 <tr><td></td><td>CW</td><td>rotate the same-colored face 90&deg; clockwise</td></tr>
