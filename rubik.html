@@ -3,8 +3,6 @@
 <head>
 <title>Rubik's Cube</title>
 <script>
-var pw=0;    // popup window
-
 /****************************************************************
  rubic cube emulation
  There are 26 cubes:
@@ -150,7 +148,7 @@ var cubelet;    // selected cubelet to be recolored in setup
 
 var faces = [];    // cubelet shown in setup
 
-var no3d = 0;         // set to disable show3d
+var skip = 0;         // set to disable show3d and showlog
 var ctx;              // canvas for 3d representation
 var HEXW = 192;       // width of 3d canvas
 var HEXH = 288;       // height of 3d canvas
@@ -158,8 +156,6 @@ var HEXH = 288;       // height of 3d canvas
 var savestack = [];
 
 function savemovestate() {
-  savestack.push(pw);
-  pw = 0;
   savestack.push(moves.slice(mp));
   moves.length = mp;
 }
@@ -167,8 +163,6 @@ function savemovestate() {
 function restoremovestate() {
   moves.length = mp;
   moves.push(...savestack.pop());
-  pw = savestack.pop();
-  pw && save2popup();
 }
 
 function classes(c) {
@@ -422,7 +416,7 @@ function initialize() {
   mp = 0;
   marks = [];
   moves.length = 0;
-  pw && save2popup();
+  showlog();
   o = document.getElementById('undoall');
   o.disabled = true;
   o.addEventListener('click',undoall);
@@ -634,8 +628,10 @@ function dodo(face,rot) { // rotate clockwise pi/2 * 0,1,2,3 mod 4
   document.getElementById('redo').disabled = true;
   document.getElementById('redoall').disabled = true;
   document.getElementById('redomark').disabled = true;
-  no3d || show3d();
-  pw && save2popup();
+  if (!skip) {
+    show3d();
+    showlog();
+  }
 }
 
 function revrot(op) {
@@ -658,8 +654,10 @@ function undo(event) {
   document.getElementById('undo').disabled = !mp;
   document.getElementById('undoall').disabled = !mp;
   document.getElementById('undomark').disabled = !mp;
-  no3d || show3d();
-  pw && save2popup();
+  if (!skip) {
+    show3d();
+    showlog();
+  }
 }
 
 function redo(event) {
@@ -674,8 +672,10 @@ function redo(event) {
       document.getElementById('redomark').disabled = true;
     }
   }
-  no3d || show3d();
-  pw && save2popup();
+  if (!skip) {
+    show3d();
+    showlog();
+  }
 }
 
 /****************************************************************/
@@ -685,7 +685,7 @@ function getorder(moveseq,noorient) { // get order of moveseq
   var s,so;
   var o = noorient?6:0;
   var c = 0;
-  no3d = 1;
+  skip = 1;
   savemovestate();
   s = oc2state();        // initial state
   so = s.substr(o);
@@ -698,7 +698,7 @@ function getorder(moveseq,noorient) { // get order of moveseq
   state2oc(s);
   mp -= c*moveseq.length;
   restoremovestate();
-  no3d = 0;
+  skip = 0;
   return c;
 }
  
@@ -725,25 +725,14 @@ function toggle(s) {
   parameterize macros by mapping faces?
 ****************************************************************/
 
-function save2popup(o) {
-  o && o.blur();
-  if (!pw || pw.closed)
-    if (o) {
-      pw = window.open('',title,'height=512,width=64,resizable=1,scrollbars=1');
-    } else {
-      pw = 0;
-      return;
-    }    
-  var title = document.getElementById('title').value;
-  var d = pw.document;
-  var s = d.body.scrollTop;
-  var x = '<html><head><title>'+title+'</title><style>p{font-family:"Lucida Console";font-size:9pt;text-align:left;line-height:9pt;margin:0;}hr{padding:0px;margin:0px;}</style></head><body>';
+function showlog(o) {
+  var x = '';
   var i;
   var j=0;
   for (i=0; i<=moves.length; i++) {
-    if (i==mp) x += '<hr>';
+    if (i==mp) x += '<hr id=".">';
     if (j < marks.length && marks[j]==i) {
-      x += '<hr style="color:#eeeeee;">';
+      if (i!=mp) x += '<hr style="color:#eeeeee;">';
       j++;
     }
     if (i == moves.length) {
@@ -753,21 +742,11 @@ function save2popup(o) {
     var o = moves[i];
     x += '<p>'+(o&3)+'WGRBOY'[o>>2]+'</p>';
   }
-  x += '</body></html>';
-  d.write(x);
-  d.close();
-  pw.scrollTo(0,s);
-  setTimeout(function() {
-    pw.focus();
-    var e;
-    var o = d.getElementsByTagName('hr')[0];
-    try {o.scrollIntoViewIfNeeded({behavior:'smooth',block:'center'});}
-    catch (e) {
-      var y = o.offsetTop;
-      var h = pw.innerHeight;
-      (y <= s || y >= s+h) && pw.scrollTo(0, y-h/2);
-    };
-  },1);
+  var d = document.getElementById('log');
+  d.innerHTML=x;
+  var y = document.getElementById('.').offsetTop;
+  var h = d.clientHeight;
+  d.scrollTop = y-d.offsetTop-h/2;
 }
 
 function mark(o) {    // return true if already marked, else mark and return false
@@ -778,7 +757,7 @@ function mark(o) {    // return true if already marked, else mark and return fal
     break;
   }
   marks.splice(i+1,0,mp);
-  pw || save2popup();
+  showlog();
   return false;
 }
 
@@ -1030,6 +1009,19 @@ canvas {
   text-align:left;
   user-select:auto;
 }
+#log {
+  font-size:10pt;
+  position:static;
+  width:50px;
+  height:500px;
+  float:right;
+  overflow:hidden;
+  overflow-y:scroll;
+}
+#log p {
+  text-align:left;
+  user-select:auto;
+}
 #info {
   display:inline;
   float:right;
@@ -1106,13 +1098,13 @@ button[id^='5'] {
 <input id="title" type="text"/>&nbsp;&nbsp;&nbsp;
 <label for="loadFile">Load from file:</label>
 <input type="file" accept=".rbk" id="loadFile" onChange="loadFiles(this)"/>&nbsp;&nbsp;
-<button type="button" id="save2window" onClick="save2popup(this)">SHOW AS TEXT</button>
+<button type="button" id="save2window" onClick="toggle('log')">SHOW AS TEXT</button>
 <div style='display:inline;padding-left:8em;'><button type="button" onClick="toggle('help')">HELP</button></div>
 <hr>
 <button id='undoall'>UNDO ALL</button>
 <button id='redoall'>REDO ALL</button>
 <label for='setup' style='font-family:sans-serif;margin-left:100px;'>SETUP</label><input type='checkbox' id='setup'>
-  <button id='reset' style='margin-left:110px;' onclick='pw && pw.close(),location.reload()'>RESET</button>
+  <button id='reset' style='margin-left:110px;' onclick='location.reload()'>RESET</button>
 <p id="info">&nbsp;</p>  
 <br>
 <button id='undo'>UNDO</button>
@@ -1199,7 +1191,8 @@ button[id^='5'] {
 </div>
 <div id='canvasdiv'><canvas id="cube3d" width="192" height="288"></canvas></div>
 <p id='ot' style='display:none'>&#8593;&#8594;&#8595;&#8592;</p>
-<div id='help' style='display:none '>
+<div id='log' style='display:none;'></div>
+<div id='help' style='display:none;'>
 <p>The banner at the top shows a Title, a button to Load from file (type .rbk) a sequence of moves, and a button to pop up the running sequence of moves.</p>
 <p>The .rbk file format is a sequence of text lines. Lines come in two types:</p>
 <p>Type 1 is a whitespace-separated sequence of moves. A move is an optional signed decimal repeat count preceding a move name.</p>
