@@ -301,6 +301,7 @@ function keydown(e) {
       return false;
     case $.ui.keyCode.DELETE:
       if (deleteItem(selectedItem)) {
+	getEnergy();
 	draw();
       }
     default:
@@ -365,31 +366,62 @@ var speededit = false;
 var speed = 1;
 var scontext;
 var gcontext;
+var econtext;
 var walls = [];    // array of walls
 var balls = [];    // array of balls
 
+var ECHSIZE=256;
 var energy = 0;    // total energy (finite masses only)
 var mass = 0;      // total mass (finite masses only)
 var pref = 0;      // reference momentum = sqrt(2*energy*mass)/N
+var ehist = Array(257);    // energy histogram
 
 function getEnergy() {
   var n = 0;    // number of finite masses
   var m;
   var v0;
   var v1;
-  energy = 0;
+  var b;
+  energy = 0;    // total energy
   mass = 0;
-  for (var b in balls) {
+  for (b in balls) {
     m = balls[b].m;
     if (isFinite(m)) {
       v0 = balls[b].v[0];
       v1 = balls[b].v[1];
       n += 1;
       mass += m;
-      energy += m*(v0*v0+v1*v1);
+      m*=(v0*v0+v1*v1);
+      balls[b].e = m;
+      energy += m;
     }
   }
   pref = Math.sqrt(energy*mass)/n;
+  // draw ball energy cumulative histogram
+  // use asinh scaling (similar to log, but linear near 0)
+  econtext.clearRect(0,0,ECHSIZE,ECHSIZE);
+  econtext.fillStyle = "black";
+  econtext.strokeStyle = "gray";
+  var i;
+  var de = Math.asinh(energy)/ECHSIZE;    // bucket size
+  ehist.fill(0);
+  for (b in balls) {
+    if (isFinite(balls[b].m))
+      ehist[Math.round(Math.asinh(balls[b].e)/de)] += 1;
+  }
+  for (i=0; i<ECHSIZE; i++) {
+    econtext.beginPath();
+    econtext.arc(i,ECHSIZE-ehist[i]*ECHSIZE/n,1,
+		 0,Math.PI*2,true);
+    econtext.closePath();
+    econtext.fill();
+    ehist[i+1] += ehist[i];
+  }
+  var eperpx = Math.asinh(energy/n)/de;  // avg ball energy
+  econtext.beginPath();
+  econtext.moveTo(eperpx,0);
+  econtext.lineTo(eperpx,ECHSIZE);
+  econtext.stroke();
   energy *= .5;
 }
 
@@ -674,6 +706,7 @@ function loadFile(s) {
       break;
     }
   }
+  getEnergy();
   draw();
   drawSpeed();
 }
@@ -721,6 +754,7 @@ function load() {
     selectedItem = o['item'];
     frozenSelection = !!selectedItem[0];
     selectItem();
+    getEnergy();
     draw();
     drawSpeed();
   } else {
@@ -784,7 +818,6 @@ function enableEdit(tf) {
 function quantizeSpeed(s) {    // quantize speed
   return pos2speed(speed2pos(s));
 }
-
 
 function speed2pos(s) {
   return (96+192*Math.asinh(s)/SPEEDWIDTH);
@@ -989,6 +1022,7 @@ function changeBall() {
     b.r = r;
     b.m = m;
     b.c = c;
+    getEnergy();
     draw();
     return true;
   }
@@ -998,12 +1032,12 @@ function changeBall() {
 function createBall() {
   selectedItem = [BALL,balls.length];
   makeBall({x:[0,0],v:[0,0],m:1,r:GASSIZE/2,c:'pink'});
-  changeBall() || draw();
+  changeBall() || getEnergy(),draw();
   return false;
 }
 
 function deleteBall() {
-  if (selectedItem[0]==BALL && deleteItem(selectedItem)) draw();
+  if (selectedItem[0]==BALL && deleteItem(selectedItem)) getEnergy(), draw();
   return false;
 }
 
@@ -1012,8 +1046,8 @@ function makeBall(d) {
 }
 
 function step() {
-  getEnergy();
   update();
+  getEnergy();
   selectItem();
   draw();
   return false;
@@ -1447,8 +1481,10 @@ function reposition(e) {
 </div>
 <p id="time" class="center"></p>
 </div>
-
-
+<div>
+<table class="center"><tr><td>Cumulative Histogram of Ball Energy</td></tr>
+<tr><td><canvas id="energy" width="256" height="256"</canvas></td></tr>
+</table>
 <script>
 gcontext = document.getElementById("gas").getContext('2d');
 gcontext.lineWidth="1";
@@ -1461,7 +1497,6 @@ makeWall(256,256,256,-256);
 makeWall(256,-256,-256,-256);
 makeWall(0,56,-56,0);
 makeWall(20,56,44,56);
-
 
 makeBall({c:'gray',m:1,r:10,x:[-236,236],v:[100,-233]});
 makeBall({c:'dimgray',m:10,r:3,x:[-156,156],v:[100,-100]});
@@ -1498,6 +1533,9 @@ $("#gas").bind({mousemove:updatePosition,
 		click:freezeSelection});
 $("#gas").css('cursor','crosshair');
 
+econtext = document.getElementById("energy").getContext('2d');
+
+getEnergy();
 draw();
 
 document.onkeydown = keydown;
