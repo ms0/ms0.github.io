@@ -408,6 +408,7 @@ function initialize() {
   o = document.getElementById('setup');
   o.checked = false;
   o.addEventListener('change',setup);
+  dict = Object.create(movedict);
   init();
   cinit();
   posefaces();
@@ -816,6 +817,34 @@ function execfcn(event) {
   mark();
 }		   
 
+document.addEventListener('keydown',keydown);
+
+var keybuf = [];
+
+function keydown(event) {
+  var o = document.getElementById('input');
+  var key = event.key;
+  if (key.length == 1) {
+    o.innerHTML = o.innerHTML+key;
+  } else {
+    switch(key.toLowerCase()) {
+    case "enter" :
+      var s = o.innerHTML;
+      o.innerHTML = '';
+      dict = dostring(s,dict);
+      showdict();
+      break;
+    case "backspace" :
+    case "delete" :
+      o.innerHTML = o.innerHTML.slice(0,o.innerHTML.length-1);
+      break;
+    default :
+      break;
+    }
+  }
+  event.preventDefault();
+}  
+
 function loadFiles(o) {
   var files = o.files;
   var i;
@@ -833,14 +862,20 @@ function loadFiles(o) {
   o.value = '';
 }
 
+var dict;
+
+function showdict() {
+  for (k in dict) {
+    if (!(k.toLowerCase() in movedict)) addfcn(k,moves2string(dict[k]));
+  }
+}
+
 function loadFile(f,o,s) {
   var k;
   document.getElementById('title').value = f.name.replace(/\.\w*$/,'');
   initialize();
-  var dict = dostring(s,Object.create(movedict));
-  for (k in dict) {
-    if (!(k.toLowerCase() in movedict)) addfcn(k,moves2string(dict[k]));
-  }
+  dict = dostring(s,dict);
+  showdict();
 }
 
 function dostring(s,dict) {
@@ -1022,6 +1057,12 @@ canvas {
   text-align:left;
   user-select:auto;
 }
+#input {
+  display:inline;
+  margin-left:20px;
+  text-align:left;
+  user-select:auto;
+}
 #info {
   display:inline;
   float:right;
@@ -1103,8 +1144,9 @@ button[id^='5'] {
 <hr>
 <button id='undoall'>UNDO ALL</button>
 <button id='redoall'>REDO ALL</button>
-<label for='setup' style='font-family:sans-serif;margin-left:100px;'>SETUP</label><input type='checkbox' id='setup'>
-  <button id='reset' style='margin-left:110px;' onclick='location.reload()'>RESET</button>
+<label for='setup' style='font-family:sans-serif;margin-left:75px;'>SETUP</label><input type='checkbox' id='setup'>
+  <button id='reset' style='margin-left:60px;' onclick='location.reload()'>RESET</button>
+<p id="input"></p>
 <p id="info">&nbsp;</p>  
 <br>
 <button id='undo'>UNDO</button>
@@ -1202,6 +1244,7 @@ button[id^='5'] {
 <p>Type 2 is a user definition starting with a case-sensitive name, a colon, and a whitespace-separated sequence of moves.</p>
 <p>User-defined names must start with a letter or an underscore but otherwise can contain digits as well as letters and underscores.</p>
 <p>Lines can contain comments initiated by #. Generated comments give the repeat counts resulting in a no-op, ignoring center cubelet orientations or not.</p>
+<p>The same line format is also accepted directly from the keyboard.</p>
 <hr>
 <p>Below the banner is a set of buttons for manipulating the Rubik's cube.</p>
 <table>
@@ -1216,7 +1259,7 @@ button[id^='5'] {
 <tr><td></td><td>CW</td><td>rotate the same-colored face 90&deg; clockwise</td></tr>
 <tr><td></td><td>SETUP</td><td>when checked, allows pairs of cubelet faces to be swapped by clicking on each in turn, reorienting the 3D cubelet(s)</td></tr>
 <tr><td></td><td>RESET</td><td>restore everything to its initial state</td></tr></table>
-<p>To the right of the colored buttons is an array of buttons to select one of the 24 mappings, followed by a list of named move sequences culled from Load from file.</p>
+<p>To the right of the colored buttons is an array of buttons to select one of the 24 mappings, followed by a list of named move sequences culled from the keyboard or Load from file.</p>
 <p>Clicking on any of those sequences executes the sequence using the selected mapping.</p>
 <hr>
 <p>Below the buttons is the Rubik&rsquo;s cube itself, with its faces unfolded. Clicking on a face&rsquo;s center square reorients the cube:</p>
