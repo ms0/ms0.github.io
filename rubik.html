@@ -817,31 +817,10 @@ function execfcn(event) {
   mark();
 }		   
 
-document.addEventListener('keydown',keydown);
-
-var keybuf = [];
-
-function keydown(event) {
-  var o = document.getElementById('input');
-  var key = event.key;
-  if (key.length == 1) {
-    o.innerHTML = o.innerHTML+key;
-  } else {
-    switch(key.toLowerCase()) {
-    case "enter" :
-      var s = o.innerHTML;
-      o.innerHTML = '';
-      dict = dostring(s,dict);
-      showdict();
-      break;
-    case "backspace" :
-    case "delete" :
-      o.innerHTML = o.innerHTML.slice(0,o.innerHTML.length-1);
-      break;
-    default :
-      break;
-    }
-  }
+function input(o) {
+  dict = dostring(o.value,dict);
+  o.value = '';
+  showdict();
   event.preventDefault();
 }  
 
@@ -1061,7 +1040,7 @@ canvas {
   display:inline;
   margin-left:20px;
   text-align:left;
-  user-select:auto;
+  width:800px;
 }
 #info {
   display:inline;
@@ -1141,13 +1120,13 @@ button[id^='5'] {
 <input type="file" accept=".rbk" id="loadFile" onChange="loadFiles(this)"/>&nbsp;&nbsp;
 <button type="button" id="save2window" onClick="toggle('log')">SHOW AS TEXT</button>
 <div style='display:inline;padding-left:8em;'><button type="button" onClick="toggle('help')">HELP</button></div>
+<p id="info">&nbsp;</p>  
 <hr>
 <button id='undoall'>UNDO ALL</button>
 <button id='redoall'>REDO ALL</button>
 <label for='setup' style='font-family:sans-serif;margin-left:75px;'>SETUP</label><input type='checkbox' id='setup'>
   <button id='reset' style='margin-left:60px;' onclick='location.reload()'>RESET</button>
-<p id="input"></p>
-<p id="info">&nbsp;</p>  
+<input id="input" onchange="input(this)" placeholder="type commands here">
 <br>
 <button id='undo'>UNDO</button>
 <button id='redo'>REDO</button>
