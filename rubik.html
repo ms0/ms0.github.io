@@ -807,6 +807,7 @@ function addfcn(name,value) {
   n.appendChild(t);
   o.appendChild(n);
   n.addEventListener('click',execfcn);
+  return n;
 }
 
 function execfcn(event) {
@@ -842,10 +843,15 @@ function loadFiles(o) {
 }
 
 var dict;
+var lastdef;
 
 function showdict() {
+  var n;
   for (k in dict) {
-    if (!(k.toLowerCase() in movedict)) addfcn(k,moves2string(dict[k]));
+    if (!(k.toLowerCase() in movedict)) {
+      n = addfcn(k,moves2string(dict[k]));
+      if (k == lastdef) n.scrollIntoView(false);
+    }
   }
 }
 
@@ -874,8 +880,14 @@ function dostring(s,dict) {
       moves.push(...expand(line,dict));
     } else {      // definition
       op = line.slice(0,c).trim();
-      if (/^[A-Za-z_]\w*$/.test(op))
-	dict[line.slice(0,c).trim()] = expand(line.slice(c+1).trim(),dict);
+      if (/^[A-Za-z_]\w*$/.test(op)) {
+	lastdef = line.slice(0,c).trim();
+	if (lastdef in movedict) {
+	  alert("Can't redefine face identifiers");
+	} else {
+	  dict[lastdef] = expand(line.slice(c+1).trim(),dict);
+	}
+      }
     }
   }
   redoall();
