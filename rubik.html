@@ -187,6 +187,13 @@ function oc2state() {    // compute state from orient and colors
   return s.join('');
 }
 
+function statediff(s,t) {
+  var i;
+  var d = 0;    // number of differences between s and t
+  for (i in s) d += s[i]!=t[i];
+  return d;
+}		     
+
 function state2oc(s) {    // update orient and colors from state s
   var i,f,r,c;
   i = 6;
@@ -702,6 +709,23 @@ function getorder(moveseq,noorient) { // get order of moveseq
   skip = 0;
   return c;
 }
+
+function getdiff(moveseq,noorient) { // get diff of moveseq
+  var d;
+  var s,t;
+  skip = 1;
+  savemovestate();
+  s = oc2state();        // initial state
+  moves.push(...moveseq);
+  redoall() ;
+  t = oc2state();        // final state
+  d = noorient ? statediff(s.slice(6),t.slice(6)) : statediff(s.slice(0,6),t.slice(0,6));
+  state2oc(s);
+  mp -= moveseq.length;
+  restoremovestate();
+  skip = 0;
+  return d;
+}
  
 /****************************************************************/
 
@@ -954,6 +978,7 @@ function moves2string(moves) {
     t.push((op&3)+'WGRBOY'[op>>2]);
   }
   t.push(' # ');
+  t.push(getdiff(moves)+'+'+getdiff(moves,true));
   t.push(getorder(moves,true));
   t.push(getorder(moves));
   return t.join(' ');
@@ -1234,8 +1259,9 @@ button[id^='5'] {
 <p>for example, (yb) maps wgrboy to ybrgow. Arguments are case-insensitive.</p>
 <p>Type 2 is a user definition starting with a case-sensitive name, a colon, and a whitespace-separated sequence of moves.</p>
 <p>User-defined names must start with a letter or an underscore but otherwise can contain digits as well as letters and underscores.</p>
-<p>Lines can contain comments initiated by #. Generated comments give the repeat counts resulting in a no-op, ignoring center cubelet orientations or not.</p>
-<p>The same line format is also accepted directly from the keyboard.</p>
+<p>Lines can contain comments initiated by #. The same line format is also accepted directly from the keyboard.</p>
+<P>Generated comments show orientation+color differences and the repeat counts resulting in a no-op, ignoring center cubelet orientations or not.</p>
+
 <hr>
 <p>Below the banner is a set of buttons for manipulating the Rubik's cube.</p>
 <table>
