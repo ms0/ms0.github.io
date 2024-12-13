@@ -184,6 +184,16 @@ function kinit() {
   }
   kcontext.stroke();
   setScale(document.getElementById('scale'));
+
+  kcanvas.addEventListener('mouseenter',mouseMove);
+  kcanvas.addEventListener('mousemove',mouseMove);
+  kcanvas.addEventListener('mouseleave',mouseLeave);
+  kcanvas.addEventListener('mouseup',mouseUp)
+  kcanvas.addEventListener('mousedown',mouseDown)
+  kcanvas.addEventListener('touchstart',touchEvent);
+  kcanvas.addEventListener('touchmove',touchEvent);
+  kcanvas.addEventListener('touchend',touchEvent);
+  kcanvas.addEventListener('touchcancel',touchEvent);
 }  
 
 function markKey(k,c) {
@@ -243,14 +253,32 @@ function setScale(se) {
   se.blur();
 }
 
+/****************************************************************
+mouse algorithm:
+  BUG: using ctrl can add multiple copies of note, but phase is not controlled
+   solution? change volume instead of adding another oscillator
+  mouseUp increments seqno if ctrl depressed, else it's like mouseLeave
+  mouseDown on keyboard same as mouseMove if ctrl depressed, else
+    stops the relevant frequency and then mouseMove
+  mouseMove not on keyboard is like mouseLeave, else
+    if no buttons it's a no-op
+    else
+      computes tone (respecting shift)
+      tries: gets frequency of current [seqno] sound
+             sets current [seqno] sound to new frequency
+             whitens old key
+             marks new key
+             updates table
+      on error, playSound (of new tone)
+  mouseLeave attempts to stopSound of current seqno [last sound]
+****************************************************************/
+
 function mouseUp(e) {
-  if (!e) e = window.event;
   if (!e.ctrlKey) mouseLeave(e)
   seqno++;
 }
 
 function mouseDown(e) {
-  if (!e) e = window.event;
   var t = Math.floor((e.offsetX)/kw)/T8;
   if (t < 0 || t > 1) return;
   if (e.ctrlKey) return mouseMove(e);
@@ -258,7 +286,6 @@ function mouseDown(e) {
 }
 
 function mouseMove(e) {
-  if (!e) e = window.event;
   var t = Math.floor((e.offsetX)/kw)/T8;
   if (t < 0 || t > 1) {
     mouseLeave(e);
@@ -283,6 +310,64 @@ function mouseLeave(e) {
     --seqno;
     tone = null;
   } catch(err) {}
+}
+
+var touches={};    // active touches, indexed by id
+
+/****************************************************************
+Keep track of touch id -> seqno
+****************************************************************/
+
+function touchEvent(e) {
+  var x0 = e.target.offsetLeft; // relative to left edge of page
+  var y0 = e.target.offsetTop;  // relative to top edge of page
+  var i;
+  var x;
+  var y;
+  var s;
+  var t;
+  // may want to make keys bigger on screen?
+  for (i in e.touches) {
+    x = e.touches[i].pageX - x0;
+    y = e.touches[i].pageY - y0;
+    t = Math.floor(x/kw)/T8;
+    tone = (t < 0 || t > 1 || y < 0 || y > kcanvas.height) ? null : Q0*2**t;
+    try {
+      s = touches[e.touches[i].id];
+      if (tone) {
+	if (Math.abs(tone-sources[s][0].frequency.value)<.001) continue;
+	stopSound(s);
+      } else {
+	stopSound(s);
+	delete touches[e.touches[i].id];
+	continue;
+      }
+    } catch (err) {}
+    playSound();
+    touches[e.touches[i].id] = seqno;
+  }
+  /*
+  e.changedTouches; // touch objects that changed state since last touch event
+  e.targetTouches;  // touch objects that started on same target as this one
+  */	     
+  /* touch object properties:
+     identifier [unique]
+     pageX [relative to left edge of page]
+     pageY [relative to top edge of page]
+     target [where touch point started]
+     radiusX [of ellipse]
+     radiusY [of ellipse]
+     rotationAngle [of ellipse, clockwise]
+     force [between 0 (no pressure) and 1 (max pressure)]
+  */
+}
+
+function touchMove(e) {
+  var x0 = e.target.offsetLeft;
+}	     
+
+function touchEnd(e) {
+  var x0 = e.target.offsetLeft;
 }
 
 var acontext = new AudioContext();
@@ -429,7 +514,7 @@ canvas {margin:auto;display:block;}
 <p>
 <label for='t'>Tones per Octave</label> <input id='t' title="Enter number of tones per octave" placeholder="Tones per Octave" onChange="initkeys(this)" value="12">&nbsp&nbsp<label for='f'>First Tone</label> <input id='f' title="Enter frequency of first tone in octave" onChange="setF0(this)" value="c"></p>
 <p>
-<label for='scaale'>Scale</label> <select id='scale' onChange='setScale(this)'>
+<label for='scale'>Scale</label> <select id='scale' onChange='setScale(this)'>
 <option value='0' selected>Major</option>
 <option value='1'>Natural Minor</option>
 <option value='2'>Harmonic Minor</option>
@@ -437,13 +522,7 @@ canvas {margin:auto;display:block;}
 <option value='4'>Hungarian Minor</option>
 </select>
 </p>
-<canvas id="keys" width="1" height="1"
-   onMouseEnter="mouseMove()"
-   onMouseLeave="mouseLeave()"
-   onMouseMove="mouseMove()"
-   onMouseUp="mouseUp()"   
-   onMouseDown="mouseDown()"
-></canvas>
+<canvas id="keys" width="1" height="1"></canvas>
 <br>
 <table id='table'>
 <tr>
