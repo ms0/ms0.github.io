@@ -327,7 +327,7 @@ function touchEvent(e) {
   var s;
   var t;
   // may want to make keys bigger on screen?
-  for (i in e.touches) {
+  for (i=0; i < e.touches.length; i++) {
     x = e.touches[i].pageX - x0;
     y = e.touches[i].pageY - y0;
     t = Math.floor(x/kw)/T8;
