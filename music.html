@@ -355,6 +355,7 @@ function touchEvent(e) {
     e.stopImmediatePropagation();
   }
   for (id in oldtouches) {    // touches no longer
+    delete touches[id];
     stopSound(oldtouches[id]);
   }
   /*
