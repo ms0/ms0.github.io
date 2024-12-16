@@ -319,6 +319,7 @@ Keep track of touch id -> seqno
 ****************************************************************/
 
 function touchEvent(e) {
+  // may want to make keys bigger on screen?
   var x0 = e.target.offsetLeft; // relative to left edge of page
   var y0 = e.target.offsetTop;  // relative to top edge of page
   var i;
@@ -327,7 +328,10 @@ function touchEvent(e) {
   var s;
   var t;
   var id;
-  // may want to make keys bigger on screen?
+  var oldtouches = {};
+  for (id in touches) {
+    oldtouches[id] = touches[id];
+  }
   for (i=0; i < e.touches.length; i++) {
     x = e.touches[i].pageX - x0;
     y = e.touches[i].pageY - y0;
@@ -336,6 +340,7 @@ function touchEvent(e) {
     try {
       id= e.touches[i].identifier;
       s = touches[id];
+      delete oldtouches[id];
       if (tone) {
 	if (Math.abs(tone-sources[s][0].frequency.value)<.001) continue;
 	stopSound(s);
@@ -348,6 +353,9 @@ function touchEvent(e) {
     playSound();
     touches[id] = seqno;
     e.stopImmediatePropagation();
+  }
+  for (id in oldtouches) {    // touches no longer
+    stopSound(oldtouches[id]);
   }
   /*
   e.changedTouches; // touch objects that changed state since last touch event
