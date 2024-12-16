@@ -21,7 +21,8 @@
 */
 
 var T8 = 12;    // number of tones in octave
-var kw = 24;    // key width
+var KW = 24;    // default key width
+var kw;         // key width
 var kh = 48;    // key height
 
 window.AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -165,6 +166,8 @@ function minit() {
 
 function kinit() {
   kcanvas = document.getElementById("keys");
+  kw = KW *
+    Math.min(1,kcanvas.parentElement.getBoundingClientRect().width/((T8+3)*KW));
   kcanvas.width = (T8+3)*kw;
   kcanvas.height = kh+1;
   kcontext = kcanvas.getContext('2d');
@@ -511,7 +514,7 @@ td {text-align:center;}
 canvas {margin:auto;display:block;touch-action:none;}
 </style>
 </head>
-<body onload="minit()">
+<body onload="minit()" onresize="minit()">
 
 <h1 style="text-align:center">Play Tones</h1>
 <p>
