@@ -326,6 +326,7 @@ function touchEvent(e) {
   var y;
   var s;
   var t;
+  var id;
   // may want to make keys bigger on screen?
   for (i=0; i < e.touches.length; i++) {
     x = e.touches[i].pageX - x0;
@@ -333,18 +334,20 @@ function touchEvent(e) {
     t = Math.floor(x/kw)/T8;
     tone = (t < 0 || t > 1 || y < 0 || y > kcanvas.height) ? null : Q0*2**t;
     try {
-      s = touches[e.touches[i].id];
+      id= e.touches[i].identifier;
+      s = touches[id];
       if (tone) {
 	if (Math.abs(tone-sources[s][0].frequency.value)<.001) continue;
 	stopSound(s);
       } else {
 	stopSound(s);
-	delete touches[e.touches[i].id];
+	delete touches[id];
 	continue;
       }
     } catch (err) {}
     playSound();
-    touches[e.touches[i].id] = seqno;
+    touches[id] = seqno;
+    e.stopImmediatePropagation();
   }
   /*
   e.changedTouches; // touch objects that changed state since last touch event
