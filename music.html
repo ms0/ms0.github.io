@@ -21,8 +21,8 @@
 */
 
 var T8 = 12;    // number of tones in octave
-var kw = 12;    // key width
-var kh = 24;    // key height
+var kw = 24;    // key width
+var kh = 48;    // key height
 
 window.AudioContext = window.AudioContext || window.webkitAudioContext;
 
@@ -165,9 +165,10 @@ function minit() {
 
 function kinit() {
   kcanvas = document.getElementById("keys");
-  kcanvas.width = (T8+1)*kw;
+  kcanvas.width = (T8+3)*kw;
   kcanvas.height = kh+1;
   kcontext = kcanvas.getContext('2d');
+  kcontext.setTransform(1,0,0,1,kw,0);
   kcontext.strokeStyle='black';
   kcontext.lineWidth='1';
   kcontext.lineCap='square';
@@ -279,14 +280,14 @@ function mouseUp(e) {
 }
 
 function mouseDown(e) {
-  var t = Math.floor((e.offsetX)/kw)/T8;
+  var t = Math.floor((e.offsetX)/kw-1)/T8;
   if (t < 0 || t > 1) return;
   if (e.ctrlKey) return mouseMove(e);
   if (!stopFreq(Q0*2**(t+e.shiftKey))) return mouseMove(e);
 }
 
 function mouseMove(e) {
-  var t = Math.floor((e.offsetX)/kw)/T8;
+  var t = Math.floor((e.offsetX)/kw-1)/T8;
   if (t < 0 || t > 1) {
     mouseLeave(e);
   } else {
@@ -335,7 +336,7 @@ function touchEvent(e) {
   for (i=0; i < e.touches.length; i++) {
     x = e.touches[i].pageX - x0;
     y = e.touches[i].pageY - y0;
-    t = Math.floor(x/kw)/T8;
+    t = Math.floor(x/kw-1)/T8;
     tone = (t < 0 || t > 1 || y < 0 || y > kcanvas.height) ? null : Q0*2**t;
     try {
       id= e.touches[i].identifier;
@@ -372,14 +373,6 @@ function touchEvent(e) {
      rotationAngle [of ellipse, clockwise]
      force [between 0 (no pressure) and 1 (max pressure)]
   */
-}
-
-function touchMove(e) {
-  var x0 = e.target.offsetLeft;
-}	     
-
-function touchEnd(e) {
-  var x0 = e.target.offsetLeft;
 }
 
 var acontext = new AudioContext();
@@ -515,7 +508,7 @@ p {text-align:center;}
 table {margin-left:auto;margin-right:auto;}
 th {text-align:center;}
 td {text-align:center;}
-canvas {margin:auto;display:block;}
+canvas {margin:auto;display:block;touch-action:none;}
 </style>
 </head>
 <body onload="minit()">
