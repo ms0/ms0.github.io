@@ -25,6 +25,9 @@ var KW = 24;    // default key width
 var kw;         // key width
 var kh = 48;    // key height
 
+var cwps=12;    // point size
+var cwfigwid=7; // figure width
+
 window.AudioContext = window.AudioContext || window.webkitAudioContext;
 
 var kcanvas;
@@ -169,9 +172,9 @@ function kinit() {
   kw = KW *
     Math.min(1,kcanvas.parentElement.getBoundingClientRect().width/((T8+3)*KW));
   kcanvas.width = (T8+3)*kw;
-  kcanvas.height = kh+1;
+  kcanvas.height = 3*kh+1;
   kcontext = kcanvas.getContext('2d');
-  kcontext.setTransform(1,0,0,1,kw,0);
+  kcontext.setTransform(1,0,0,1,kw,kh);
   kcontext.strokeStyle='black';
   kcontext.lineWidth='1';
   kcontext.lineCap='square';
@@ -187,6 +190,10 @@ function kinit() {
     kcontext.lineTo(kw*x,kh);
   }
   kcontext.stroke();
+
+  var k;
+  for (k=T8+1; k--;) showfrac(k,.01);
+
   setScale(document.getElementById('scale'));
 
   kcanvas.addEventListener('mouseenter',mouseMove);
@@ -257,6 +264,76 @@ function setScale(se) {
   se.blur();
 }
 
+function f2cf(r) {    // convert r to continued fraction
+  var cf = [];
+  var d;
+  var i;
+  for (i=32; i--;) {
+    cf.push(d=Math.floor(r));
+    if (!(r-=d)) break;
+    r = 1/r;
+  }
+  return cf;
+}
+
+function cf2r(c) {    // convert continued fraction to rational
+  var s,t,d;
+  var m0 = 0;
+  var m1 = 1;
+  var n0 = 1;
+  var n1 = 0;
+  for (i in c) {
+    d = c[i];
+    s = n0
+    t = n1;
+    n0 = m0+d*n0;
+    n1 = m1+d*n1;
+    m0 = s;
+    m1 = t;
+  }
+  return [n0,n1]
+}
+
+function cf2f(c) {    // convert continued fraction to float
+  var f = cf2r(c);
+  return f[0]/f[1];
+}
+
+function bestr(x,m) {    // get best simple fraction for x
+  // return best [n,d] with numerator and denominator < m
+  var c = f2cf(x);
+  var f,g;
+  var i;
+  f = cf2r(c);
+  if (f[0] < m && f[1] < m) return f;
+  for (i = c.length; i > 1; --i) {
+    g = cf2r(c.slice(0,i-1));
+    if (g[0] < m && g[1] < m) {
+      for (; --c[i] > 0;) { 
+	f = cf2r(c);
+	if (f[0] < m && f[1] < m) return f;
+      }
+      return g;
+    }
+  }
+  return [c[0],1];
+}  
+
+function showfrac(k) {    // show fraction under key k
+  var f = 2**(k/T8);
+  var r = bestr(f,20);
+  if (Math.abs(r[0]/r[1]/f-1) < .01) {
+    var x = (k+.5)*kw;
+    var t;
+    t = r[0]+'';
+    kcontext.fillText(t,x-t.length*cwfigwid/2,kh+2*cwps);
+    t = '_'.repeat(t.length);
+    kcontext.fillText(t,x-t.length*cwfigwid/2,kh+2*cwps);
+    t = r[1]+'';
+    kcontext.fillText(t,x-t.length*cwfigwid/2,kh+3*cwps-2);
+  }
+}  
+
 /****************************************************************
 mouse algorithm:
   BUG: using ctrl can add multiple copies of note, but phase is not controlled
@@ -284,14 +361,16 @@ function mouseUp(e) {
 
 function mouseDown(e) {
   var t = Math.floor((e.offsetX)/kw-1)/T8;
-  if (t < 0 || t > 1) return;
+  var y = e.offsetY/kh-1;
+  if (y < 0 || y > 1 || t < 0 || t > 1) return;
   if (e.ctrlKey) return mouseMove(e);
   if (!stopFreq(Q0*2**(t+e.shiftKey))) return mouseMove(e);
 }
 
 function mouseMove(e) {
   var t = Math.floor((e.offsetX)/kw-1)/T8;
-  if (t < 0 || t > 1) {
+  var y = e.offsetY/kh-1;
+  if (y < 0 || y > 1 || t < 0 || t > 1) {
     mouseLeave(e);
   } else {
     if (!e.buttons) return;
@@ -338,9 +417,9 @@ function touchEvent(e) {
   }
   for (i=0; i < e.touches.length; i++) {
     x = e.touches[i].pageX - x0;
-    y = e.touches[i].pageY - y0;
+    y = e.touches[i].pageY - y0 - kh;
     t = Math.floor(x/kw-1)/T8;
-    tone = (t < 0 || t > 1 || y < 0 || y > kcanvas.height) ? null : Q0*2**t;
+    tone = (t < 0 || t > 1 || y < 0 || y > kh) ? null : Q0*2**t;
     try {
       id= e.touches[i].identifier;
       s = touches[id];
