@@ -25,8 +25,8 @@ var KW = 24;    // default key width
 var kw;         // key width
 var kh = 48;    // key height
 
-var cwps=12;    // point size
-var cwfigwid=7; // figure width
+var cwps=10;    // point size
+var cwfigwid=6; // figure width
 
 window.AudioContext = window.AudioContext || window.webkitAudioContext;
 
@@ -175,10 +175,12 @@ function kinit() {
   kcanvas.height = 3*kh+1;
   kcontext = kcanvas.getContext('2d');
   kcontext.setTransform(1,0,0,1,kw,kh);
+  kcontext.fillStyle='black';
   kcontext.strokeStyle='black';
   kcontext.lineWidth='1';
   kcontext.lineCap='square';
   kcontext.lineJoin='miter';
+  kcontext.font = cwps+"px Arial";
 
   kcontext.beginPath();
   kcontext.moveTo(0,0);
@@ -330,7 +332,7 @@ function showfrac(k) {    // show fraction under key k
     t = '_'.repeat(t.length);
     kcontext.fillText(t,x-t.length*cwfigwid/2,kh+2*cwps);
     t = r[1]+'';
-    kcontext.fillText(t,x-t.length*cwfigwid/2,kh+3*cwps-2);
+    kcontext.fillText(t,x-t.length*cwfigwid/2,kh+3*cwps);
   }
 }  
 
