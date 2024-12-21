@@ -324,7 +324,7 @@ function bestr(x,m) {    // get best simple fraction for x
 function showfrac(k) {    // show fraction under key k
   var f = 2**(k/T8);
   var r = bestr(f,20);
-  if (Math.abs(r[0]/r[1]/f-1) < .01) {
+  if (Math.abs(r[0]/r[1]/f-1) < (2**(1/T8)-1)/5) {
     var x = (k+.5)*kw;
     var t;
     t = r[0]+'';
