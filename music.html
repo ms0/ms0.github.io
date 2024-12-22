@@ -302,18 +302,23 @@ function cf2f(c) {    // convert continued fraction to float
 }
 
 function bestr(x,m) {    // get best simple fraction for x
-  // return best [n,d] with numerator and denominator < m
+  // return best [n,d] with n < m and d < m
   var c = f2cf(x);
+  var e;
   var f,g;
   var i;
   f = cf2r(c);
   if (f[0] < m && f[1] < m) return f;
-  for (i = c.length; i > 1; --i) {
-    g = cf2r(c.slice(0,i-1));
+  for (i = c.length; --i > 0; c = c.slice(0,i)) {
+    g = cf2r(c.slice(0,i));
     if (g[0] < m && g[1] < m) {
-      for (; --c[i] > 0;) { 
+      e = Math.floor((c[i]-1)/2);
+      for (; --c[i] > e;) { 
 	f = cf2r(c);
-	if (f[0] < m && f[1] < m) return f;
+	if (f[0] < m && f[1] < m &&
+	    Math.abs(x-f[0]/f[1]) < Math.abs(x-g[0]/g[1])) {
+	  return f;
+	}
       }
       return g;
     }
