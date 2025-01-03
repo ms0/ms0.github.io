@@ -1,0 +1,158 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<script type="text/javascript" id="MathJax-script" async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
+<script>
+
+var cwidth;
+var cheight = 50;
+
+function init() {
+  cwidth=document.body.offsetWidth;
+  initsine();
+  initplot();
+}
+
+function axes(ctx) {
+  var w = ctx.canvas.width;
+  var h = ctx.canvas.height;
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,cwidth,cheight);
+  ctx.translate(cwidth/2,cheight/2);
+  ctx.lineJoin=1;
+  ctx.lineCap=1;
+  ctx.fillStyle='black';
+  ctx.strokeStyle='black';
+  ctx.lineWidth=.5
+  ctx.beginPath();
+  ctx.moveTo(-w,0);
+  ctx.lineTo(w,0);
+  ctx.moveTo(0,-h);
+  ctx.lineTo(0,h);
+  ctx.stroke();
+  ctx.lineWidth=1;
+}
+
+var cvp;
+var ctp;
+
+function initplot() {
+  cvp = document.getElementById('plot');
+  ctp = cvp.getContext('2d');
+  cvp.width = cwidth;
+  cvp.height = cheight;
+  ctp.setTransform(1,0,0,1,0,0);
+  ctp.clearRect(0,0,cwidth,cheight);
+  ctp.translate(cwidth/2,cheight/2);
+}
+
+function plot(ctx,f) {
+  ctx.beginPath();
+  ctx.moveTo(-cwidth/2,-cheight/2*f(-cwidth/cheight));
+  for (i=-cwidth/2; ++i <= cwidth/2; ) {
+    ctx.lineTo(i,-cheight/2*f(i*2/cheight));
+  }
+  ctx.stroke();
+}
+
+function initsine() {
+  var cvs = document.getElementById('sine');
+  var cts = cvs.getContext('2d');
+  cvs.width = cwidth;
+  cvs.height = cheight;
+  axes(cts);
+  plot(cts,function(x){return Math.sin(x);});
+}
+
+function draw(k) {
+  axes(ctp);
+  var f;
+  switch (k) {
+  case 0 :
+    f = function(x){return 1/2;};
+    break;
+  case 1:
+    f = function(x){return x/6-1/2;};
+    break;
+  case 2:
+    f = function(x){return (x/4+1)**2-1;};
+    break;
+case 3:
+    f = function(x){return (x-1)*(x-2)*(x+1)/16;}
+    break;
+  }
+  plot(ctp,f);
+}
+
+function showpopup(o,s) {
+  var b = document.body.getClientRects()[0];
+  var r = o.parentNode.getClientRects()[0];
+  o = document.getElementById(s);
+  o.style.display='block';
+  var q = o.getClientRects()[0];
+  o.style.position = 'absolute';
+  o.style.left = (r.width-q.width)/2+'px';
+  o.style.top = (r.top+r.bottom-q.height)/2-b.top+'px';
+}
+</script>
+<style>
+span {
+  text-decoration:underline;
+  cursor:context-menu;
+}
+h1 {
+  text-align:center;
+  font-size:18pt;
+}
+h2 {
+  text-align:center;
+  font-size:14pt;
+}
+canvas {
+  display:block;
+  margin:10px auto;
+  height:50px;
+  width:inherit;
+}
+body {
+  max-width:820px;
+}
+.popup {
+  background-color:white;
+  display:none;
+  z-index:1;
+  position:absolute;
+  top:0;
+  left:0;
+  padding:6px;
+  margin:6px;
+  border:1px solid black;
+  max-width:inherit;
+}
+</style>
+</head>
+<body onload="init()" onresize="init()">
+<h1>Fi and Lu encounter functions</h1>
+<p>Grandpa felt it was time for Fi and Lu to learn about functions. After all, their uncle was about their age when Grandpa taught him. &ldquo;You see functions all the time. A function is anything that associates each thing in a certain collection of things with some other thing from perhaps a different collection of things. We say that the function <b><i>maps</i></b> the thing to the other thing. A dictionary is a function that maps a word to information about that word, usually its definition and perhaps its pronunciation and etymology. Addition is a function that maps a pair of numbers to their sum. Multiplication maps a pair of numbers to their product. The Fibonacci sequence is a function that maps an integer, <i>n</i>, to the <i>n</i>th Fibonacci number, \(f_n\).</p>
+<p>&ldquo;When a function maps a single number to another number, we often visualize that function with a two-dimensional plot. We usually use the first number (the <b><i>argument</i></b>) as the <i>x</i> coordinate (the <b><i>abscissa</i></b>) and the other number (the <b><i>value</i></b>) as the <i>y</i> coordinate (the <b><i>ordinate</i></b>) to locate the point that shows the mapping of the argument to the value. Typically, when we plot such a function, we also draw the <i>x</i> axis (the line of points with zero ordinate) and the <i>y</i> axis (the line of points with zero abscissa). For example, here&rsquo;s the plot of the sine function:</p>
+<canvas id='sine'></canvas>
+<p>&ldquo;Some of the simplest mathematical functions we encounter are polynomials. We usually use the letter \(x\) to represent the argument. Unsurprisingly, a polynomial is a sum of monomials. &lsquo;What is a monomial?&rsquo; you ask. It&rsquo;s a number times a nonnegative integer power of \(x\). For example, \(7x^5\).</p>
+  <p>&ldquo;The simplest polynomial is just a constant, such as \(\frac{1}{2}\), which plots as a <span onclick="draw(0)">horizontal straight line</span>. Next is a linear polynomial such as \(\frac{1}{6}x-\frac{1}{2}\), which also plots as a <span onclick="draw(1)">line</span>. A quadratic polynomial, like \(\frac{1}{16}x^2+\frac{1}{2}x\), plots as a <span onclick="draw(2)">parabola</span>. Higher <span onclick="showpopup(this,'degree')">degree</span> polynomials can wiggle, like <span onClick="draw(3)">this cubic polynomial</span> \(\frac{1}{16}x^3-\frac{1}{8}x^2-\frac{1}{16}x+\frac{1}{8}\).
+<canvas id="plot"></canvas>
+<p>&ldquo;It&rsquo;s not hard to see that the plot of a polynomial can only change direction fewer times than its degree. To get an infinite number of wiggles like the sine function, you need a power series. In fact, \(\sin x = x-\frac{x^3}{3!} + \frac{x^5}{5!} - \frac{x^7}{7!} + \cdots\), otherwise written as \(\sum_0^\infty \frac{(-1)^n x^{2n+1}}{(2n+1)!}\). And \(\cos x = 1-\frac{x^2}{2!}+\frac{x^4}{4!}-\frac{x^6}{6!}+\cdots = \sum_0^\infty \frac{(-1)^n x^{2n}}{(2n)!}\).
+<p>&ldquo;There&rsquo;s a particularly important function that maps polynomials to polynomials. It&rsquo;s called the derivative, for reasons we&rsquo;ll see when we talk about calculus. The derivative of \(p\) is designated by \(p^\prime\), pronounced <i>pee prime</i>. It&rsquo;s a linear function, which means that (\(kp)^\prime = kp^\prime\) for any constant \(k\) and polynomial \(p\), and (\(p+q)^\prime = p^\prime+q^\prime\) for any pair of polynomials \(p\) and \(q\). So we can define it by just describing what it does to monomials: \((x^n)^\prime = nx^{n-1}\). Note that this means that the derivative of a constant is zero. It&rsquo;s not hard to show that \((pq)^\prime = p^\prime q + pq^\prime\)&mdash;it&rsquo;s clearly true for monomials, and linearity and distributivity complete the proof. One of the consequences of this is that if a polynomial has a repeated <span onclick="showpopup(this,'root')">root</span>, that root is also a root of its derivative.&rdquo;</p>
+<div id="degree" class="popup" onclick="this.style.display='none'">
+<h2>Degree</h2>
+<p>The degree of a monomial is its exponent, and the degree of a polynomial is the maximum degree of its monomials; the zero polynomial has no monomials and so its degree is \(-\infty\). For example, linear polynomials like \(x+3\) have degree 1, quadratic polynomials like \(3x^2+2x+1\) have degree 2, cubic polynomials like \(5x^3-7x^2+9x-11\) have degree 3, and all nonzero constant polynomials like \(2\) have degree 0.</p>
+<p>With this definition, it&rsquo;s clear that the degree of a product of polynomials is the sum of their degrees.</p>
+<p>Note that we&rsquo;ve only been talking about polynomials in one variable. For multivariable polynomials, the degree of a monomial is the sum of its exponents. For example, \(x^2y^3z\) has degree 6, since 2+3+1=6.</p>
+</div>
+<div id="root" class="popup" onclick="this.style.display='none'">
+<h2>Roots of Polynomials</h2>
+<p>A root of a polynomial is an argument for which the polynomial&rsquo;s value is zero: \(t\) is a root of polynomial \(p\) if \(p(t)\)=0. It&rsquo;s easy to see that if \(t\) is a root of \(p\) then \(x-t\) divides \(p\): by polynomial division, we know that \(p = (x-t)q+r\) for some quotient polynomial \(q\) and remainder \(r\), and so \(0 = p(t) = (t-t)q(t)+r = r\), i.e., the remainder is zero. A root \(t\) of \(p\) is a repeated root if \((x-t)^2\) divides \(p\).</p>
+</div>
+</body>
+</html>

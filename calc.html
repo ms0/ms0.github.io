@@ -1,0 +1,215 @@
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<script type="text/javascript" id="MathJax-script" async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
+<script>
+
+var cwidth;
+var cheight = 70;
+var cinheight = 50;
+
+var cvp;
+var ctp;
+
+function init() {
+  cwidth=document.body.offsetWidth;
+  initplot();
+  drawsine();
+  
+}
+
+function initplot() {
+  cvp = document.getElementById('plot');
+  cvp.addEventListener('click',showtan);
+  ctp = cvp.getContext('2d');
+  cvp.width = cwidth;
+  cvp.height = cheight;
+  ctp.setTransform(1,0,0,1,0,0);
+  ctp.clearRect(0,0,cwidth,cheight);
+  ctp.translate(cwidth/2,cheight/2);
+}
+
+function plot(ctx,f) {
+  ctx.beginPath();
+  ctx.moveTo(-cwidth/2,-cinheight/2*f(-cwidth/cinheight));
+  for (i=-cwidth/2; ++i <= cwidth/2; ) {
+    ctx.lineTo(i,-cinheight/2*f(i*2/cinheight));
+  }
+  ctx.stroke();
+}
+
+function axes(ctx) {
+  var w = ctx.canvas.width;
+  var h = ctx.canvas.height;
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0,0,cwidth,cheight);
+  ctx.translate(cwidth/2,cheight/2);
+  ctx.lineJoin=1;
+  ctx.lineCap=1;
+  ctx.fillStyle='red';
+  ctx.strokeStyle='black';
+  ctx.lineWidth=.5
+  ctx.beginPath();
+  ctx.moveTo(-w,0);
+  ctx.lineTo(w,0);
+  ctx.moveTo(0,-h);
+  ctx.lineTo(0,h);
+  ctx.stroke();
+  ctx.lineWidth=1;
+}
+
+function drawsine() {
+  axes(ctp);
+  plot(ctp,function(x){return Math.sin(x);})
+}
+
+var timer;
+var delta;
+var x;
+
+function showtan(event) {
+  if (event) {
+    event.target.style.cursor='none'
+    var rect = event.target.getBoundingClientRect();
+    x = event.clientX-rect.x-cwidth/2;
+    
+    timer = clearInterval(timer);
+    delta = Math.min(cwidth/16,cwidth/2-x);
+    timer = setInterval(showtan,50,0);
+  }
+  var m;
+  var b;
+  drawsine();
+  ctp.beginPath();
+  var y = -cinheight/2*Math.sin(x*2/cinheight);
+  if (!delta) {
+    timer = clearInterval(timer);
+    cvp.style.cursor='crosshair';
+    m = -Math.cos(x*2/cinheight);
+  } else {
+    m = -cinheight/2*(Math.sin((x+delta)*2/cinheight)-Math.sin(x*2/cinheight))/delta;
+  }
+  b = y-m*x;
+  ctp.moveTo(x-cwidth/16,(x-cwidth/16)*m+b);
+  ctp.lineTo(x+cwidth/16,(x+cwidth/16)*m+b);
+  ctp.stroke();
+  ctp.beginPath();
+  ctp.arc(x,y,2,0,2*Math.PI);
+  ctp.closePath();
+  ctp.arc(x+delta,m*(x+delta)+b,2,0,2*Math.PI);
+  ctp.fill();
+  if (--delta < 1) {
+    delta = 0;
+  }
+}
+
+function showpopup(o,s) {
+  var b = document.body.getClientRects()[0];
+  var r = o.parentNode.getClientRects()[0];
+  o = document.getElementById(s);
+  o.style.display='block';
+  var q = o.getClientRects()[0];
+  o.style.position = 'absolute';
+  o.style.left = (r.width-q.width)/2+'px';
+  o.style.top = (r.top+r.bottom-q.height)/2-b.top+'px';
+}
+</script>
+<style>
+span {
+  text-decoration:underline;
+  cursor:context-menu;
+}
+h1 {
+  text-align:center;
+  font-size:18pt;
+}
+h2 {
+  text-align:center;
+  font-size:14pt;
+}
+canvas {
+  display:block;
+  margin:0 auto;
+  cursor:crosshair;
+}
+.popup {
+  background-color:white;
+  display:none;
+  z-index:1;
+  position:absolute;
+  top:0;
+  left:0;
+  padding:6px;
+  margin:6px;
+  border:1px solid black;
+  max-width:inherit;
+}
+body {
+  max-width:820px;
+}
+</style>
+</head>
+<body id='body' onload="init()" onresize="init()">
+<h1>Fi and Lu conquer calculus</h1>
+<p>Fi liked the pretty curves that she saw when tackling trigonometry. She imagined skiing on those curves, speeding up on the downslopes and slowing down on the upslopes. Lu realized that the steepness of the slopes could be measured by looking at nearby points. Mom said that this was called <i>differentiation</i>. &ldquo;You can draw a tangent to the curve at a point&mdash;a straight line that just touches the curve at that point. The slope of that tangent is just how much it goes up for each unit it goes forward. You can approximate the tangent by taking two points on the curve very close to each other and drawing a line between them. As the two points get closer together, they provide a better approximation to the tangent. (Click the plot below.)</p>
+<canvas id='plot'></canvas>    
+<p>&ldquo;For a function \(f(x)\), we can define the derivative of \(f(x)\) with respect to \(x\), the function that gives the slope of the tangent to \(f(x)\) at each point \(x\), as
+\[\frac{df(x)}{dx} = \lim_{\delta\rightarrow 0} \frac{f(x+\delta)-f(x)}{\delta}\]
+&ldquo;This is a standard notation for derivative, but it&rsquo;s a bit strange. The \(d\) should not be considered as a separate entity, but as paired with the thing that follows it. And that&rsquo;s why the derivative of a derivative, called the <i>second derivative</i> is written as \[\frac{d^2f(x)}{dx^2}\]
+&ldquo;It&rsquo;s not much of a stretch to see that
+\[f(x+\delta) = f(x) + \frac{df(x)}{dx}\delta + o(\delta)\] where \(o(\delta)\) means some function \(h\) such that \[\lim_{\delta\rightarrow 0}\frac{h(\delta)}{\delta} = 0\]
+&ldquo;From these definitions, we can deduce some properties of derivatives:
+\begin{align*}\frac{d(f(x)+g(x))}{dx} &= \lim_{\delta\rightarrow 0} \frac{f(x+\delta)+g(x+\delta)-f(x)-g(x)}{\delta} \\ &= \lim_{\delta\rightarrow 0} \frac{f(x+\delta)-f(x)}{\delta} + \lim_{\delta\rightarrow 0} \frac{g(x+\delta)-g(x)}{\delta}\\ &= \frac{df(x)}{dx} + \frac{dg(x)}{dx}\end{align*}
+\begin{align*}\frac{d(f(x)g(x))}{dx} &= \lim_{\delta\rightarrow 0} \frac{f(x+\delta)g(x+\delta)-f(x)g(x)}{\delta} \\ &= \lim_{\delta\rightarrow 0} \frac{(f(x)+\frac{df(x)}{dx}\delta+o(\delta))(g(x)+\frac{dg(x)}{dx}\delta+o(\delta))-f(x)g(x)}{\delta} \\ &= \lim_{\delta\rightarrow 0}\frac{f(x)g(x)+f(x)\frac{dg(x)}{dx}\delta+\frac{df(x)}{dx}g(x)\delta+o(\delta)-f(x)g(x)}{\delta} \\ &= f(x)\frac{dg(x)}{dx}+\frac{df(x)}{dx}g(x)\end{align*}
+\begin{align*}\frac{d(f(g(x))}{dx} &= \lim_{\delta\rightarrow 0} \frac{f(g(x+\delta))-f(g(x))}{\delta} \\ &= \lim_{\delta\rightarrow 0} \frac{(f(g(x)+\frac{dg(x)}{dx}\delta+o(\delta))-f(g(x))}{\delta} \\ &= \lim_{\delta\rightarrow 0}\frac{f(g(x))+\frac{df(g(x))}{dg(x)}\left(\frac{dg(x)}{dx}\delta+o(\delta)\right)-f(g(x))}{\delta} \\ &= \frac{df(g(x))}{dg(x)}\frac{dg(x)}{dx}\end{align*}
+&rdquo;Let&rsquo;s tackle a few examples. When we talked about polynomials, we defined the derivative and said that the definition would make sense when we covered calculus. Well, \[d(x^n)/dx = \lim_{\delta\rightarrow 0} \frac{(x+\delta)^n-x^n}{\delta} = \frac{x^n + n\delta x^{n-1} + o(\delta) - x^n}{\delta} = nx^{n-1}\]
+&ldquo;Another example that comes to mind is \(b^x\).
+  \[\frac{d(b^x)}{dx} = \lim_{\delta\rightarrow 0} \frac{b^{x+\delta}-b^x}{\delta} = \lim_{\delta\rightarrow 0} \frac{b^x (b^\delta-1)}{\delta} = b^x \lim_{\delta\rightarrow 0} \frac{b^\delta-1}{\delta}\]
+&ldquo;But what is that last limit? There&rsquo;s some \(b\) for which that limit is 1; let&rsquo;s call that number \(e\). We&rsquo;ll write \(\ln\) for \(\log_e\) and call \(\ln\) the natural <span onclick="showpopup(this,'log')">logarithm</span>, and say that \(e\) is the base of natural logarithms. Then we have \[\frac{d(e^x)}{dx} = e^x\] and so \[\frac{d(b^x)}{dx} = \frac{d(e^{x\ln b})}{dx} = \frac{d(e^{x\ln b})}{d(x\ln b)} \frac{d(x\ln b)}{dx} = e^{x\ln b} \ln b = b^x \ln b\]
+&ldquo;A question that comes to mind is what is the derivative of \(\ln x\)? Well
+\[ 1 = \frac{dx}{dx} = \frac{d(e^{\ln x})}{dx} = \frac{d(e^{\ln x})}{d(\ln x)}\frac{d(\ln x)}{dx} = e^{\ln x}\frac{d(\ln x)}{dx} = x \frac{d(\ln x)}{dx}\] so
+\[\frac{d(\ln x)}{dx} = \frac{1}{x}\]
+&ldquo;As another example, we can use our knowledge of trigonometry to compute the derivative of \(\sin x\): \begin{align*}\frac{d(\sin x)}{dx} &=  \lim_{\delta\rightarrow 0} \frac{\sin(x+\delta)-\sin x}{\delta} \\ &= \lim_{\delta\rightarrow 0} \frac{\sin x \cos\delta + \cos x \sin\delta-\sin x}{\delta} \\ &= \lim_{\delta\rightarrow 0} \frac{\cos x \sin\delta-(1-\cos\delta)\sin x}{\delta}\end{align*}
+&ldquo;We can notice that \(1-\cos\delta = (1-cos^2\delta)/(1+\cos\delta) = \sin^2\delta/(1+\cos\delta)\). We know that \(\sin 0 = 0\) and \(\cos 0 = 1\), while \(\lim_{\delta\rightarrow 0} \frac{\sin\delta}{\delta} = 1\), so we see that \begin{align*}\frac{d(\sin x)}{dx} &= \lim_{\delta\rightarrow 0} \frac{\cos x \sin\delta-(1-\cos\delta)\sin x}{\delta} \\ &= \lim_{\delta\rightarrow 0} \frac{\cos x \sin\delta-\frac{\sin^2\delta}{1+\cos\delta}\sin x}{\delta} \\ &= \left(\cos x - \frac{\sin 0}{1+\cos 0} \sin x\right) \lim_{\delta\rightarrow 0} \frac{\sin\delta}{\delta} \\ &= \cos x\end{align*}
+&ldquo;We can then easily compute the derivative of \(\cos x\):
+\[\frac{d(\cos x)}{dx} = \frac{d(\sin(\frac{\pi}{2}-x))}{dx} = \frac{d(\sin(\frac{\pi}{2}-x))}{d(\frac{\pi}{2}-x)}\frac{d(\frac{\pi}{2}-x)}{dx} = \cos(\frac{\pi}{2}-x)(-1) = -\sin x\]
+&ldquo;And now we can compute the derivative of \(\tan x\):
+\[\frac{d(\tan x)}{dx} = \frac{d((\sin x) (\cos x)^{-1})}{dx} = (\cos x) (\cos x)^{-1} + (\sin x) (-(\cos x)^{-2}) (-\sin x) = 1 + \tan^2 x\]
+&ldquo;And this allows us to compute the derivative of the inverse of \(\tan x\), called \(\arctan x\), the angle whose tangent is \(x\):
+\[1 = \frac{dx}{dx} = \frac{d(\tan(\arctan x))}{dx} = (1+(\tan(\arctan x))^2)\frac{d(\arctan x)}{dx} = (1+x^2)\frac{d(\arctan x)}{dx}\] so
+\[\frac{d(\arctan x)}{dx} = \frac{1}{1+x^2}\]
+<h2>Taylor series</h2>
+&ldquo;Suppose we have a function that can be expressed as an infinite series about a point \(c\):
+\[f(x) = \sum_{n=0}^\infty a_n (x-c)^n\]
+&ldquo;Writing the <i>n</i>th derivative of \(f\) at the point \(c\) as \(f^{(n)}(c)\), we see that
+\[f^{(n)}(c) = n!a_n\] so
+\[a_n = \frac{f^{(n)}(c)}{n!}\]
+&ldquo;Applying this to \(e^x\), \(\sin x\), and \(\cos x\), with \(c=0\), we get
+\[e^x = \sum_{n=0}^\infty \frac{x^n}{n!}\]
+\[\cos x = \sum_{n=0}^\infty (-1)^n\frac{x^{2n}}{{2n}!}\]
+\[\sin x = \sum_{n=0}^\infty (-1)^n\frac{x^{2n+1}}{(2n+1)!}\]
+&ldquo;Substituting complex quantities, where \(i^2=-1\), we can match terms to see that
+\[e^{ix} = \cos x + i\sin x\]
+\[\cos x = \frac{e^{ix}+e^{-ix}}{2}\]
+\[\sin x = \frac{e^{ix}-e^{-ix}}{2i}\]
+&ldquo;We can attempt to get the Taylor series for \(\ln (1-x)\), finding
+\[\ln (1-x) = -\sum_{n=1}^\infty \frac{x^n}{n}\]
+but it&rsquo;s fairly clear that this can&rsquo;t work for \(|x|>1\), since the sum diverges, and logs of negative numbers aren&rsquo;t real.</p>
+<p>&ldquo;We can do the same thing for \(\arctan x\), but it&rsquo;s actually easier to first expand \(\frac{1}{1+x^2}\) as a power series by direct division and then ask what that&rsquo;s the derivative of:
+\[\frac{1}{1+x^2} = \sum_{n=0}^\infty (-1)^n x^{2n}\]
+\[\arctan x = \sum_{n=0}^\infty (-1)^n \frac{x^{2n+1}}{2n+1}\]
+&ldquo;Just as with \(\ln (1-x)\), this can&rsquo;t work for \(|x|>1\), as the sum diverges. But for \(x=1\), it gives a series for \(\frac{\pi}{4}\). Sadly, this converges <i>very</i> slowly, but the tangent addition formula can be used to find faster formulas using arctan. In 1706, John Machin used \(\frac{\pi}{4} = 4\arctan\frac{1}{5} - \arctan\frac{1}{239}\) to calculate a hundred digits of \(\pi\). Of course, now we have computers as well as much faster algorithms.&rdquo;</p>
+<div id='log' class="popup" onclick="this.style.display='none'">
+<h2>Logarithms</h2>
+<p>Logarithms and exponentiation are opposites. \(\log_b x\) is the exponent that base \(b\) has to be raised to to get \(x\): \(b^{\log_b x}=x\). Of course that also means that \(\log_b b^x = x\).</p>
+<p>Since \(b^c b^d = b^{c+d}\), multiplying two numbers is equivalent to adding their logarithms: \(xy =b^{\log_b x}b^{\log_b y} = b^{\log_b x + \log_b y}\), so \(\log_b xy = \log_b x + \log_b y\). And since \(b^{cd} = (b^c)^d\), we can see, by raising \(a\) to each side, that \(\log_a b\ \log_b c = \log_a c\).</p>
+<p>The natural base for logarithms is \(e\), sometimes called Euler&rsquo;s number. Using \(\log\) without specifying the base can sometimes mean the base is ten (&ldquo;common logarithm&rdquo;) and sometimes mean the base is \(e\) (&ldquo;natural logarithm&rdquo;), and occasionally even that the base is two. So, as is quite common, we use \(\ln\) to mean \(\log_e\).</p>
+</body>
+</html>
+<!--talk about functions, monomials, polynomials, binomial theorem -->
+<!-- pictures: simple plots; approximating tangent -->
+<!--interaction: type in function, see plot -->
+<!-- how hard is it to parse subset of Tex and turn into a function? math.js -->
