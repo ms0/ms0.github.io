@@ -22,6 +22,29 @@ function exp(a,b) {
   return Math.pow(a,b);
 }
 
+function muls(a,b) {
+  return a+symbol['mul']+b;
+}
+
+function adds(a,b) {
+  return a+symbol['add']+b;
+}
+
+function exps(a,b) {
+  return a+sup(b);
+}
+
+function sup(n) {
+  n = n+'';
+  var s = '';
+  var i;
+  for (i=0; i < n.length; i++) {
+    s += {'0':'\u2070','1':'\u00b9','2':'\u00b2','3':'\u00b3','4':'\u2074',
+	  '5':'\u2075','6':'\u2076','7':'\u2077','8':'\u2078','9':'\u2079'}[n[i]];
+  }
+  return s;
+}
+
 var URLdict;
 
 function readURLquerystring() {
@@ -56,6 +79,7 @@ function randomlypermute(a) {
 
 var symbol = {'add':'+','mul':'&times;','exp':'^'}
 var f = {'add':add,'mul':mul,'exp':exp};
+var g = {'add':adds,'mul':muls,'exp':exps};
 var xc = {'add':0,'mul':1,'exp':1};
 var xr = {'add':0,'mul':1,'exp':1};
 var lc;
@@ -133,7 +157,7 @@ function init(again) {
 	  u.innerHTML += '<th>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'+rows[row]+'</th>';
 	} else {
 	  if (!id) id = row+'-'+col;
-	  u.innerHTML += '<td><input onKeydown="checkkey(event,this)" onChange="check(this)" size="'+maxlength+'" maxlength="'+maxlength+'" id="'+row+'-'+col+'"name="'+f[op](rows[row],cols[col])+'"></td>';
+	  u.innerHTML += '<td><input onKeydown="checkkey(event,this)" onChange="check(this)" size="'+maxlength+'" maxlength="'+maxlength+'" id="'+row+'-'+col+'"name="'+f[op](rows[row],cols[col])+'" placeholder="'+g[op](rows[row],cols[col])+'"></td>';
 	}
       }
     }
