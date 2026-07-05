@@ -157,7 +157,7 @@ function init(again) {
 	  u.innerHTML += '<th>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'+rows[row]+'</th>';
 	} else {
 	  if (!id) id = row+'-'+col;
-	  u.innerHTML += '<td><input onKeydown="checkkey(event,this)" onChange="check(this)" size="'+maxlength+'" maxlength="'+maxlength+'" id="'+row+'-'+col+'"name="'+f[op](rows[row],cols[col])+'" placeholder="'+g[op](rows[row],cols[col])+'"></td>';
+	  u.innerHTML += '<td><input onKeydown="checkkey(event,this)" onChange="check(this)" onInput="qcheck(this)" size="'+maxlength+'" maxlength="'+maxlength+'" id="'+row+'-'+col+'"name="'+f[op](rows[row],cols[col])+'" placeholder="'+g[op](rows[row],cols[col])+'"></td>';
 	}
       }
     }
@@ -206,8 +206,13 @@ function checkkey(e,o) {
   var y=0;
   switch (e.keyCode) {
   case 9:  //tab
-    x=1;
-    if (c == cols.length-1) y=1;
+    if (e.shiftKey) {
+      x=-1;
+      if (c == 1) y=-1;
+    } else {
+      x=1;
+      if (c == cols.length-1) y=1;
+    }
     break;
   case 37: //leftarrow
     x=-1;
@@ -249,8 +254,12 @@ function checkkey(e,o) {
   return false;
 }  
 
-function check(o) {
+function qcheck(o) {
   if (!timer) starttime();
+  if (o.className == 'ok' || o.value && 1*o.value == 1*o.name) check(o);
+}		      
+
+function check(o) {
   o.className = o.value ? 1*o.value == 1*o.name ? 'ok' : 'err' : '';
   score = document.getElementsByClassName('ok').length;
   if (score == (rows.length-1)*(cols.length-1)) {
